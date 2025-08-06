@@ -1,0 +1,39 @@
+{
+  "file_path": "gs://your-bucket/path/to/file.mp4",
+  "content_type": "video/mp4", 
+  "upload_time": "2025-08-05T10:00:00Z",
+  "last_updated": "2025-08-05T10:00:00Z",
+  "poster_url": "https://placehold.co/1280x720/000000/FFFFFF?text=Default+Poster",
+  "is_dummy": false,
+
+  "summary": {
+    "status": "pending",
+    "text": "...",
+    "chapters": [], 
+    "error_message": null,
+    "last_updated": null
+  },
+
+  "transcription": {
+    "status": "pending",
+    "text": "...",
+    "language": "en-US",
+    "gcs_uri": "gs://your-transcription-output-bucket/transcriptions/asset_id.txt",
+    "error_message": null,
+    "last_updated": null
+  },
+
+  "previews": {
+    "status": "pending",
+    "clips": [],
+    "error_message": null,
+    "last_updated": null
+  },
+
+  "article_details": {
+    "author": "Jane Doe",
+    "publication_date": "2025-08-01",
+    "word_count": 1500,
+    "topics": ["AI", "Cloud Computing", "Machine Learning"]
+  }
+}
