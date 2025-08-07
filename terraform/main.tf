@@ -16,6 +16,16 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false # Set to true if you want to disable APIs on `terraform destroy`
 }
 
+# --- Artifact Registry Repository ---
+resource "google_artifact_registry_repository" "docker_repo" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = var.artifact_registry_repo
+  description   = "Docker repository for media metadata pipeline images"
+  format        = "DOCKER"
+  depends_on = [google_project_service.apis["artifactregistry.googleapis.com"]]
+}
+
 # --- GCS Buckets (Inputs) ---
 # Note: These buckets still exist, but no automatic notification to Pub/Sub is configured.
 resource "google_storage_bucket" "input_buckets" {
@@ -115,6 +125,7 @@ resource "google_project_iam_member" "metadata_generator_firestore_user" {
 # This allows Pub/Sub to invoke the Cloud Run service when a message arrives
 resource "google_cloud_run_service_iam_member" "batch_processor_pubsub_invoker" {
   service  = "batch-processor-dispatcher"
+  project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -123,6 +134,7 @@ resource "google_cloud_run_service_iam_member" "batch_processor_pubsub_invoker" 
 
 resource "google_cloud_run_service_iam_member" "summaries_generator_pubsub_invoker" {
   service  = "summaries-generator"
+  project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -131,6 +143,7 @@ resource "google_cloud_run_service_iam_member" "summaries_generator_pubsub_invok
 
 resource "google_cloud_run_service_iam_member" "transcription_generator_pubsub_invoker" {
   service  = "transcription-generator"
+  project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -139,6 +152,7 @@ resource "google_cloud_run_service_iam_member" "transcription_generator_pubsub_i
 
 resource "google_cloud_run_service_iam_member" "previews_generator_pubsub_invoker" {
   service  = "previews-generator"
+  project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
   member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
@@ -273,7 +287,7 @@ resource "google_pubsub_subscription" "batch_processor_sub" {
 
   # Push configuration to Cloud Run service
   push_config {
-    push_endpoint = google_cloud_run_service.batch_processor.uri
+    push_endpoint = google_cloud_run_service.batch_processor.status[0].url
     # Pub/Sub service account needs invoker role on the Cloud Run service
     oidc_token {
       service_account_email = google_service_account.batch_processor_sa.email # Using separate SA
@@ -289,7 +303,7 @@ resource "google_pubsub_subscription" "summaries_sub" {
   ack_deadline_seconds = 600 # Adjust based on expected processing time
 
   push_config {
-    push_endpoint = google_cloud_run_service.summaries_generator.uri
+    push_endpoint = google_cloud_run_service.summaries_generator.status[0].url
     oidc_token {
       service_account_email = google_service_account.metadata_generator_sa.email # Consolidated SA
     }
@@ -300,10 +314,10 @@ resource "google_pubsub_subscription" "transcription_sub" {
   project = var.project_id
   name    = "transcription-generator-sub"
   topic   = google_pubsub_topic.transcription_topic.name
-  ack_deadline_seconds = 1800 # Adjust for potentially long transcription times (up to 30 mins)
+  ack_deadline_seconds = 600 # Adjust for potentially long transcription times 
 
   push_config {
-    push_endpoint = google_cloud_run_service.transcription_generator.uri
+    push_endpoint = google_cloud_run_service.transcription_generator.status[0].url
     oidc_token {
       service_account_email = google_service_account.metadata_generator_sa.email # Consolidated SA
     }
@@ -317,7 +331,7 @@ resource "google_pubsub_subscription" "previews_sub" {
   ack_deadline_seconds = 600
 
   push_config {
-    push_endpoint = google_cloud_run_service.previews_generator.uri
+    push_endpoint = google_cloud_run_service.previews_generator.status[0].url
     oidc_token {
       service_account_email = google_service_account.metadata_generator_sa.email # Consolidated SA
     }

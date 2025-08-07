@@ -15,30 +15,35 @@ variable "input_bucket_names" {
   default     = []
 }
 
+variable "artifact_registry_repo" {
+  description = "The name of the Artifact Registry repository to store Docker images."
+  type        = string
+  default     = "media-pipeline-images"
+}
 
 # Docker Images for Cloud Run Services
 variable "batch_processor_image" {
   description = "Docker image URL for the Batch Processor Cloud Run service."
   type        = string
-  default     = "gcr.io/${var.project_id}/batch-processor-dispatcher:latest"
+  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/batch-processor-dispatcher:latest"
 }
 
 variable "summaries_generator_image" {
   description = "Docker image URL for the Summaries Generator Cloud Run service."
   type        = string
-  default     = "gcr.io/${var.project_id}/summaries-generator:latest" # This is the default
+  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/summaries-generator:latest"
 }
 
 variable "transcription_generator_image" {
   description = "Docker image URL for the Transcription Generator Cloud Run service."
   type        = string
-  default     = "gcr.io/${var.project_id}/transcription-generator:latest"
+  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/transcription-generator:latest"
 }
 
 variable "previews_generator_image" {
   description = "Docker image URL for the Previews Generator Cloud Run service."
   type        = string
-  default     = "gcr.io/${var.project_id}/previews-generator:latest"
+  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/previews-generator:latest"
 }
 
 

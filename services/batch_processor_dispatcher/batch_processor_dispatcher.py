@@ -1,9 +1,9 @@
 import os
 import json
 # Import your logging configuration
-from logging_config import configure_logger
+from common.logging_config import configure_logger
 import logging
-from google.cloud import pubsub_v1, firestore
+from flask import Flask, request
 from config import FILE_TYPE_PROMPT_MAP
 from common.media_asset_manager import MediaAssetManager
 
@@ -31,6 +31,8 @@ TOPIC_PATHS = {
     "transcription": publisher.topic_path(project_id, TRANSCRIPTION_TOPIC) if TRANSCRIPTION_TOPIC else None,
     "previews": publisher.topic_path(project_id, PREVIEWS_TOPIC) if PREVIEWS_TOPIC else None,
 }
+
+app = Flask(__name__)
 
 def process_file_event(event_data):
     """
@@ -102,15 +104,11 @@ def process_file_event(event_data):
             logger.info(f"Skipping task '{task_name}' for file_category '{file_category}' (not applicable or topic config missing).", extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "file_category": file_category}})
 
 
-def main(request):
+@app.route("/", methods=["POST"])
+def handle_message():
     """
     Cloud Run entry point for Pub/Sub push messages.
     """
-    from datetime import datetime # Import here to avoid circular dependency in simplified example
-
-    if request.method != 'POST':
-        return 'Only POST requests are accepted', 405
-
     request_json = request.get_json(silent=True)
     if not request_json or not 'message' in request_json:
         logger.warning("Invalid Pub/Sub message format. Request missing 'message' key.")
@@ -121,7 +119,7 @@ def main(request):
         # Pub/Sub messages are base64 encoded
         message_data = json.loads(pubsub_message['data'].decode('utf-8'))
         process_file_event(message_data)
-        return '', 200 # Acknowledge the message
+        return '', 204 # Acknowledge the message
     except Exception as e:
         logger.critical("Overall processing failed for Pub/Sub message.", exc_info=True, extra={"extra_fields": {"pubsub_message": pubsub_message}})
         # Acknowledge the message by returning a success code (204) to Pub/Sub.
@@ -129,3 +127,4 @@ def main(request):
         # where a malformed message could cause an infinite retry loop.
         # For critical errors, a Dead-Letter Queue (DLQ) would be the next step.
         return "Error processing message, but acknowledging to prevent retries.", 204
+

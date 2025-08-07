@@ -1,5 +1,6 @@
 {
   "file_path": "gs://your-bucket/path/to/file.mp4",
+  "public_url": "https://storage.googleapis.com/your-bucket/path/to/file.mp4",
   "content_type": "video/mp4", 
   "upload_time": "2025-08-05T10:00:00Z",
   "last_updated": "2025-08-05T10:00:00Z",
