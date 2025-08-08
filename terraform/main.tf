@@ -121,6 +121,22 @@ resource "google_project_iam_member" "metadata_generator_firestore_user" {
   member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
 }
 
+# --- IAM Bindings for Pub/Sub to impersonate Service Accounts ---
+
+# Allow the Pub/Sub service account to create OIDC tokens for the SAs used in push subscriptions.
+# This is required for authenticated Cloud Run invocation from Pub/Sub.
+resource "google_service_account_iam_member" "batch_processor_sa_token_creator" {
+  service_account_id = google_service_account.batch_processor_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "metadata_generator_sa_token_creator" {
+  service_account_id = google_service_account.metadata_generator_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 # Pub/Sub Service Account to Cloud Run Invoker role for push subscriptions
 # This allows Pub/Sub to invoke the Cloud Run service when a message arrives
 resource "google_cloud_run_service_iam_member" "batch_processor_pubsub_invoker" {
@@ -128,7 +144,9 @@ resource "google_cloud_run_service_iam_member" "batch_processor_pubsub_invoker" 
   project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  # The member is the service account that Pub/Sub will impersonate to invoke the service.
+  # This must match the service_account_email in the subscription's push_config.
+  member   = "serviceAccount:${google_service_account.batch_processor_sa.email}"
   depends_on = [google_cloud_run_service.batch_processor]
 }
 
@@ -137,7 +155,7 @@ resource "google_cloud_run_service_iam_member" "summaries_generator_pubsub_invok
   project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.summaries_generator]
 }
 
@@ -146,7 +164,7 @@ resource "google_cloud_run_service_iam_member" "transcription_generator_pubsub_i
   project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.transcription_generator]
 }
 
@@ -155,7 +173,7 @@ resource "google_cloud_run_service_iam_member" "previews_generator_pubsub_invoke
   project  = var.project_id
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.previews_generator]
 }
 

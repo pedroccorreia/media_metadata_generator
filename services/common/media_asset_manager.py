@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from google.cloud import firestore
 import logging
+from typing import Optional
 
 # Get a logger instance for this module.
 # It will inherit the configuration from the root logger in the service entry point.
@@ -46,7 +47,7 @@ class MediaAssetManager:
         file_path: str,
         content_type: str,
         file_category: str,
-        public_url: str | None = None,
+        public_url: Optional[str] = None,
         poster_url: str = "https://placehold.co/1280x720/000000/FFFFFF?text=Default+Poster",
         is_dummy: bool = False
     ) -> bool:

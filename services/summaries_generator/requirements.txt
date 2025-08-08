@@ -1,5 +1,5 @@
-google-cloud-pubsub==2.19.0 # Pin to a specific version for stability
-google-cloud-firestore==2.11.0 # Pin to a specific version
-google-cloud-storage==2.10.0 # Pin to a specific version
-Flask==2.2.2 # Web framework to handle HTTP requests from Pub/Sub
-gunicorn==20.1.0 # WSGI server to run the Flask app in production
+google-cloud-pubsub
+google-cloud-firestore
+google-cloud-storage
+Flask
+gunicorn

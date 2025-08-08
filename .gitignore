@@ -1,3 +1,6 @@
+older/
+.DS_Store
+
 # Terraform state and plan files
 *.tfstate
 *.tfstate.*
@@ -7,3 +10,12 @@
 *.tfvars
 terraform/.terraform
 terraform/.terraform.lock.hcl
+
+# Exclude all json files that are not samples in the test folder
+test/*.json
+!test/sample_*.json
+
+
+# Currently exclude tests
+tests/
+pytest.ini

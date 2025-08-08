@@ -1,15 +1,16 @@
 import os
 import json
 # Import your logging configuration
-from common.logging_config import configure_logger
+# from common.logging_config import configure_logger
 import logging
 from flask import Flask, request
-from config import FILE_TYPE_PROMPT_MAP
-from common.media_asset_manager import MediaAssetManager
+# from config import FILE_TYPE_PROMPT_MAP
+from google.cloud import pubsub_v1
+# from common.media_asset_manager import MediaAssetManager
 
 
 #Logging setup
-configure_logger()
+# configure_logger()
 # Get a logger instance for this specific module.
 # It will inherit the configuration set by configure_logger()
 logger = logging.getLogger(__name__) 
@@ -19,7 +20,7 @@ project_id = os.environ.get("GCP_PROJECT_ID")
 publisher = pubsub_v1.PublisherClient()
 
 # MediaAssetManager setup
-asset_manager = MediaAssetManager(project_id=project_id)
+# asset_manager = MediaAssetManager(project_id=project_id)
 # Pub/Sub topic names (read from environment variables for flexibility)
 SUMMARIES_TOPIC = os.environ.get("PUBSUB_TOPIC_SUMMARIES")
 TRANSCRIPTION_TOPIC = os.environ.get("PUBSUB_TOPIC_TRANSCRIPTION")
@@ -59,6 +60,11 @@ def process_file_event(event_data):
     }
     logger.info(f"Received event for asset_id: {asset_id}", extra=log_extra)
 
+    # Get client instances using the lazy-loaded getters
+    asset_manager = get_asset_manager()
+    publisher = get_publisher()
+    topic_paths = get_topic_paths()
+
     # 1. Create the initial asset record in Firestore using the manager.
     # This sets up the full document structure with 'pending' or 'not_applicable' statuses.
     if not asset_manager.insert_asset(
@@ -76,7 +82,7 @@ def process_file_event(event_data):
     task_configs = FILE_TYPE_PROMPT_MAP.get(file_category, {}) # Get configs for this file type
 
     # 2. Dispatch to Task-Specific Topics
-    for task_name, topic_path in TOPIC_PATHS.items():
+    for task_name, topic_path in topic_paths.items():
         task_prompt_config = task_configs.get(task_name)
 
         # Check if the task is applicable for this file type and the topic is configured
@@ -127,4 +133,9 @@ def handle_message():
         # where a malformed message could cause an infinite retry loop.
         # For critical errors, a Dead-Letter Queue (DLQ) would be the next step.
         return "Error processing message, but acknowledging to prevent retries.", 204
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
 
