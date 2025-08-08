@@ -59,7 +59,7 @@ class MediaAssetManager:
             file_path (str): GCS URI of the original media file.
             content_type (str): MIME type of the media file (e.g., "video/mp4").
             file_category (str): The category of the file (e.g., "video", "audio", "document").
-            public_url (str | None, optional): Publicly accessible URL for the media file. Defaults to None.
+            public_url (Optional[str], optional): Publicly accessible URL for the media file. Defaults to None.
             poster_url (str, optional): URL for a poster image. Defaults to a placeholder.
             is_dummy (bool, optional): Flag if this is dummy content. Defaults to False.
 
@@ -119,7 +119,7 @@ class MediaAssetManager:
             logger.error(f"Error inserting asset {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return False
 
-    def get_asset(self, asset_id: str) -> dict | None:
+    def get_asset(self, asset_id: str) -> Optional[dict]:
         """
         Retrieves a media asset document from Firestore.
 
@@ -127,7 +127,7 @@ class MediaAssetManager:
             asset_id (str): The unique ID of the media asset.
 
         Returns:
-            dict | None: The asset's data as a dictionary, or None if not found.
+            Optional[dict]: The asset's data as a dictionary, or None if not found.
         """
         doc_ref = self._get_doc_ref(asset_id)
         try:
