@@ -1,0 +1,17 @@
+steps:
+  # This step uses the official Docker builder to build the image.
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag'
+      - '${_IMAGE_TAG}'
+      - '--file'
+      - '${_DOCKERFILE_PATH}'
+      - '.' # Use the root of the workspace as the build context
+
+# This 'images' section tells Cloud Build to push the built image to the registry.
+images:
+  - '${_IMAGE_TAG}'
+
+# Optional: You can specify a timeout for the build.
+timeout: '1200s'
