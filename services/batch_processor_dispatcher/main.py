@@ -4,7 +4,7 @@ import base64
 import logging
 from common.logging_config import configure_logger
 from flask import Flask, request
-from config import FILE_TYPE_PROMPT_MAP
+from batch_processor_dispatcher.config import FILE_TYPE_PROMPT_MAP
 from google.cloud import pubsub_v1
 from common.media_asset_manager import MediaAssetManager
 

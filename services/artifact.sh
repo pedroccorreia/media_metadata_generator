@@ -13,14 +13,6 @@
 #
 # Usage:
 #   ./artifact_publish.sh <service_name>
-#
-# Example:
-#   export GCP_PROJECT_ID="your-gcp-project-id"
-#   export GCP_REGION="us-central1"
-#   export AR_REPO_NAME="media-pipeline-images"
-#   ./artifact_publish.sh summaries-generator
-
-
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
@@ -43,9 +35,9 @@ echo "Authenticating Docker with Google Artifact Registry..."
 gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev --quiet
 
 IMAGE_TAG="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_NAME}/${SERVICE_NAME}:latest"
-DOCKERFILE_PATH="${SERVICE_NAME}/Dockerfile"
+DOCKERFILE_PATH="Dockerfile.${SERVICE_NAME}"
 
-echo "Building Docker image for ${SERVICE_NAME}..."
+echo "Building Docker image for ${SERVICE_NAME} from ${DOCKERFILE_PATH}..."
 # Use '.' as the build context to allow access to the 'common' directory.
 # The -f flag specifies the path to the Dockerfile.
 # The --push flag builds and pushes the image in a single step.

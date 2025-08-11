@@ -19,3 +19,5 @@ test/*.json
 # Currently exclude tests
 tests/
 pytest.ini
+*/.venv
+.pytest_cache

@@ -1,0 +1,25 @@
+# Dockerfile.summaries_generator
+
+# Use a slim Python base image
+FROM python:3.9-slim-buster
+
+# Set environment variables
+ENV PYTHONUNBUFFERED True
+ENV PYTHONPATH /app
+
+# Set the working directory inside the container
+WORKDIR /app
+
+
+# Copy service-specific requirements and install them
+COPY summaries_generator/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+# Copy the shared common code and the service code into the container
+COPY common/ /app/common/
+COPY summaries_generator/ /app/summaries_generator/
+
+# Expose the port the app runs on
+EXPOSE 8080
+
+# Command to run the application.
+CMD ["gunicorn", "--bind", ":8080", "--workers", "1", "--threads", "8", "--timeout", "0", "summaries_generator.main:app"]
