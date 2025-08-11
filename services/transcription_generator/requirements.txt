@@ -1,5 +1,4 @@
-google-cloud-pubsub
-google-cloud-firestore
-google-cloud-storage
 Flask
+google-cloud-firestore
 gunicorn
+google-cloud-aiplatform>

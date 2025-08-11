@@ -17,19 +17,38 @@ configure_logger()
 logger = logging.getLogger(__name__) 
 
 # Pub/Sub setup
-project_id = os.environ.get("GCP_PROJECT_ID")
-publisher = pubsub_v1.PublisherClient()
-
-# MediaAssetManager setup
-asset_manager = MediaAssetManager(project_id=project_id)
+project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 # Pub/Sub topic names (read from environment variables for flexibility)
 SUMMARIES_TOPIC = os.environ.get("PUBSUB_TOPIC_SUMMARIES")
 TRANSCRIPTION_TOPIC = os.environ.get("PUBSUB_TOPIC_TRANSCRIPTION")
 PREVIEWS_TOPIC = os.environ.get("PUBSUB_TOPIC_PREVIEWS")
 
+# --- Configuration Validation ---
+# Ensure all required environment variables are set. This prevents the service
+# from running in a misconfigured state.
+if not all([project_id, SUMMARIES_TOPIC, TRANSCRIPTION_TOPIC, PREVIEWS_TOPIC]):
+    missing_vars = [
+        var for var, val in {
+            "GOOGLE_CLOUD_PROJECT": project_id,
+            "PUBSUB_TOPIC_SUMMARIES": SUMMARIES_TOPIC,
+            "PUBSUB_TOPIC_TRANSCRIPTION": TRANSCRIPTION_TOPIC,
+            "PUBSUB_TOPIC_PREVIEWS": PREVIEWS_TOPIC,
+        }.items() if not val
+    ]
+    # This is a critical configuration error. The service cannot run without these.
+    logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}. Shutting down.")
+    exit(1) # In a container, this will cause it to exit and be restarted.
+
+logger.info(f"Booting up with the following env variables {project_id} | {SUMMARIES_TOPIC} | {TRANSCRIPTION_TOPIC} | {PREVIEWS_TOPIC}")
+
+publisher = pubsub_v1.PublisherClient()
+# MediaAssetManager setup
+asset_manager = MediaAssetManager(project_id=project_id)
+
 # Pre-format the full topic paths for efficiency
 TOPIC_PATHS = {
     "summary": publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None,
+    "chapterization": publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None,
     "transcription": publisher.topic_path(project_id, TRANSCRIPTION_TOPIC) if TRANSCRIPTION_TOPIC else None,
     "previews": publisher.topic_path(project_id, PREVIEWS_TOPIC) if PREVIEWS_TOPIC else None,
 }
@@ -132,6 +151,3 @@ def handle_message():
         # where a malformed message could cause an infinite retry loop.
         # For critical errors, a Dead-Letter Queue (DLQ) would be the next step.
         return "Error processing message, but acknowledging to prevent retries.", 204
-
-
-

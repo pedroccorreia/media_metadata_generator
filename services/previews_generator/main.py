@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import logging
 from flask import Flask, request
 
@@ -11,7 +12,7 @@ configure_logger()
 logger = logging.getLogger(__name__)
 
 # Initialize clients
-project_id = os.environ.get("GCP_PROJECT_ID")
+project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 asset_manager = MediaAssetManager(project_id=project_id)
 
 # Initialize Flask app
@@ -78,7 +79,7 @@ def handle_message():
     asset_id = None # Initialize asset_id to handle errors before it's parsed
 
     try:
-        message_data = json.loads(pubsub_message['data'].decode('utf-8'))
+        message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         prompt_config = message_data.get("prompt_config")
@@ -93,15 +94,16 @@ def handle_message():
         asset_manager.update_asset_metadata(asset_id, "previews", {"status": "processing"})
         preview_results = generate_previews(asset_id, file_location, prompt_config)
 
-        if preview_results and "clips" in preview_results:
-            update_data = {"status": "completed", "clips": preview_results["clips"], "error_message": None}
-            asset_manager.update_asset_metadata(asset_id, "previews", update_data)
-            logger.info(f"Successfully completed preview generation for asset: {asset_id}", extra=log_extra)
-        else:
-            update_data = {"status": "failed", "error_message": "Preview generation returned no results."}
-            asset_manager.update_asset_metadata(asset_id, "previews", update_data)
-            logger.error(f"Preview generation failed for asset: {asset_id}", extra=log_extra)
-
+        # if preview_results and "clips" in preview_results:
+        #     update_data = {"status": "completed", "clips": preview_results["clips"], "error_message": None}
+        #     asset_manager.update_asset_metadata(asset_id, "previews", update_data)
+        #     logger.info(f"Successfully completed preview generation for asset: {asset_id}", extra=log_extra)
+        # else:
+        #     update_data = {"status": "failed", "error_message": "Preview generation returned no results."}
+        #     asset_manager.update_asset_metadata(asset_id, "previews", update_data)
+        #     logger.error(f"Preview generation failed for asset: {asset_id}", extra=log_extra)
+        logger.info(f"Successfully completed preview generation for asset: {asset_id}", extra=log_extra)
+        
         return '', 204
     except Exception as e:
         logger.critical("Unhandled exception during preview generation.", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})

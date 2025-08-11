@@ -9,7 +9,8 @@ resource "google_project_service" "apis" {
     "cloudbuild.googleapis.com",      # Needed for Cloud Run deployments if using source builds
     "artifactregistry.googleapis.com", # Recommended for storing Docker images
     "cloudscheduler.googleapis.com",   # For optional batch processing trigger
-    "cloudresourcemanager.googleapis.com" # Implicit, but good to ensure
+    "cloudresourcemanager.googleapis.com", # Implicit, but good to ensure
+    "aiplatform.googleapis.com"       # For Vertex AI services
   ])
   project = var.project_id
   service = each.key
@@ -121,6 +122,13 @@ resource "google_project_iam_member" "metadata_generator_firestore_user" {
   member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
 }
 
+resource "google_project_iam_member" "metadata_generator_aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
+}
+
 # --- IAM Bindings for Pub/Sub to impersonate Service Accounts ---
 
 # Allow the Pub/Sub service account to create OIDC tokens for the SAs used in push subscriptions.
@@ -215,6 +223,10 @@ resource "google_cloud_run_service" "batch_processor" {
           name  = "PUBSUB_TOPIC_PREVIEWS"
           value = google_pubsub_topic.previews_topic.name
         }
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
       }
       container_concurrency = var.batch_processor_concurrency
       timeout_seconds = 300 # 5 minutes default
@@ -238,6 +250,14 @@ resource "google_cloud_run_service" "summaries_generator" {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
         image = var.summaries_generator_image # Placeholder
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
       }
       container_concurrency = var.summaries_generator_concurrency
       timeout_seconds = 600 # 10 minutes, can be adjusted for long tasks
@@ -260,6 +280,10 @@ resource "google_cloud_run_service" "transcription_generator" {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
         image = var.transcription_generator_image # Placeholder
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
       }
       container_concurrency = var.transcription_generator_concurrency
       timeout_seconds = 1800 # 30 minutes, can be adjusted for long audio
@@ -282,6 +306,10 @@ resource "google_cloud_run_service" "previews_generator" {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
         image = var.previews_generator_image # Placeholder
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
       }
       container_concurrency = var.previews_generator_concurrency
       timeout_seconds = 600 # 10 minutes

@@ -7,7 +7,7 @@
 # which can be sourced from a .env file or set in a CI/CD pipeline.
 #
 # Required Environment Variables:
-#   - GCP_PROJECT_ID: Your Google Cloud project ID.
+#   - GOOGLE_CLOUD_PROJECT: Your Google Cloud project ID.
 #   - GCP_REGION: The region for the Artifact Registry (e.g., us-central1).
 #   - AR_REPO_NAME: The name of the Artifact Registry repository.
 #
@@ -24,8 +24,8 @@ if [ -z "$SERVICE_NAME" ]; then
     exit 1
 fi
 
-if [ -z "$GCP_PROJECT_ID" ] || [ -z "$GCP_REGION" ] || [ -z "$AR_REPO_NAME" ]; then
-    echo "Error: Required environment variables (GCP_PROJECT_ID, GCP_REGION, AR_REPO_NAME) are not set."
+if [ -z "$GOOGLE_CLOUD_PROJECT" ] || [ -z "$GCP_REGION" ] || [ -z "$AR_REPO_NAME" ]; then
+    echo "Error: Required environment variables (GOOGLE_CLOUD_PROJECT, GCP_REGION, AR_REPO_NAME) are not set."
     exit 1
 fi
 
@@ -34,7 +34,7 @@ fi
 # # to authenticate with Artifact Registry for the specified region.
 # gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev --quiet
 
-IMAGE_TAG="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_NAME}/${SERVICE_NAME}:latest"
+IMAGE_TAG="${GCP_REGION}-docker.pkg.dev/${GOOGLE_CLOUD_PROJECT}/${AR_REPO_NAME}/${SERVICE_NAME}:latest"
 DOCKERFILE_PATH="Dockerfile.${SERVICE_NAME}"
 
 # echo "Building Docker image for ${SERVICE_NAME} from ${DOCKERFILE_PATH}..."

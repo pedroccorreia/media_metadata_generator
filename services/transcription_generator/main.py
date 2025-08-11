@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import logging
 from flask import Flask, request
 
@@ -11,7 +12,7 @@ configure_logger()
 logger = logging.getLogger(__name__)
 
 # Initialize clients and Flask app
-project_id = os.environ.get("GCP_PROJECT_ID")
+project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 asset_manager = MediaAssetManager(project_id=project_id)
 
 # Initialize Flask app
@@ -62,7 +63,7 @@ def handle_message():
     asset_id = None  # Initialize asset_id for error logging
 
     try:
-        message_data = json.loads(pubsub_message['data'].decode('utf-8'))
+        message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
 

@@ -1,5 +1,5 @@
+Flask
 google-cloud-pubsub
 google-cloud-firestore
-google-cloud-storage
-Flask
 gunicorn
+google-cloud-aiplatform

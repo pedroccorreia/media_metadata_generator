@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script automates the process of running 'artifact_publish.sh' for a predefined list of services.
-export GCP_PROJECT_ID="fox-metadata-468100"
+export GOOGLE_CLOUD_PROJECT="fox-metadata-468100"
 export GCP_REGION="us-central1"
 export AR_REPO_NAME="media-pipeline-images"
 
@@ -10,8 +10,8 @@ export AR_REPO_NAME="media-pipeline-images"
 services=(
     "summaries_generator"
     "batch_processor_dispatcher"
-    "previews_generator"
-    "transcription_generator"
+    # "previews_generator"
+    # "transcription_generator"
 )
 
 # Loop through each service name in the 'services' array.
