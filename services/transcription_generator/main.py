@@ -75,10 +75,11 @@ def handle_message():
         logger.info(f"Processing transcription generation request for asset: {asset_id}", extra=log_extra)
         
         asset_manager.update_asset_metadata(asset_id, "transcription", {"status": "processing"})
-        transcription_results = generate_transcription(asset_id, file_location)
+        # TODO: No processing currently
+        # transcription_results = generate_transcription(asset_id, file_location)
 
-        update_data = {"status": "completed", "text": transcription_results.get("text"), "words": transcription_results.get("words", []), "error_message": None}
-        asset_manager.update_asset_metadata(asset_id, "transcription", update_data)
+        # update_data = {"status": "completed", "text": transcription_results.get("text"), "words": transcription_results.get("words", []), "error_message": None}
+        # asset_manager.update_asset_metadata(asset_id, "transcription", update_data)
         logger.info(f"Successfully completed transcription generation for asset: {asset_id}", extra=log_extra)
 
         return '', 204

@@ -21,3 +21,5 @@ tests/
 pytest.ini
 */.venv
 .pytest_cache
+
+.venv/

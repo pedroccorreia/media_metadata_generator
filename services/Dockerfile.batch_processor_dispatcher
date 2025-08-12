@@ -13,6 +13,7 @@ WORKDIR /app
 # Copy service-specific requirements and install them
 COPY batch_processor_dispatcher/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade google-genai
 
 # Copy the shared common code and the service code into the container
 COPY common/ /app/common/

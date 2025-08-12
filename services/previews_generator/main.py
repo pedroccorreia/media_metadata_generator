@@ -82,17 +82,17 @@ def handle_message():
         message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
-        prompt_config = message_data.get("prompt_config")
-
-        if not all([asset_id, file_location, prompt_config]):
-            logger.error("Message missing required data: asset_id, file_location, or prompt_config.", extra={"extra_fields": {"message_data": message_data}})
+        
+        if not all([asset_id, file_location]):
+            logger.error("Message missing required data: asset_id, file_location", extra={"extra_fields": {"message_data": message_data}})
             return "Bad Request: missing required data", 400
         
         log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
         logger.info(f"Processing preview generation request for asset: {asset_id}", extra=log_extra)
         
         asset_manager.update_asset_metadata(asset_id, "previews", {"status": "processing"})
-        preview_results = generate_previews(asset_id, file_location, prompt_config)
+        # TODO: no processing at this stage
+        # preview_results = generate_previews(asset_id, file_location, prompt_config)
 
         # if preview_results and "clips" in preview_results:
         #     update_data = {"status": "completed", "clips": preview_results["clips"], "error_message": None}
