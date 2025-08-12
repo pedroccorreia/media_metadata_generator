@@ -4,7 +4,6 @@ import base64
 import logging
 from common.logging_config import configure_logger
 from flask import Flask, request
-from batch_processor_dispatcher.config import FILE_TYPE_PROMPT_MAP
 from google.cloud import pubsub_v1
 from common.media_asset_manager import MediaAssetManager
 
@@ -44,13 +43,18 @@ logger.info(f"Booting up with the following env variables {project_id} | {SUMMAR
 publisher = pubsub_v1.PublisherClient()
 # MediaAssetManager setup
 asset_manager = MediaAssetManager(project_id=project_id)
-
 # Pre-format the full topic paths for efficiency
 TOPIC_PATHS = {
     "summary": publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None,
-    "chapterization": publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None,
     "transcription": publisher.topic_path(project_id, TRANSCRIPTION_TOPIC) if TRANSCRIPTION_TOPIC else None,
     "previews": publisher.topic_path(project_id, PREVIEWS_TOPIC) if PREVIEWS_TOPIC else None,
+}
+
+# Defines which tasks are applicable for each file category.
+CATEGORY_TASK_MAP = {
+    "video": ["summary", "transcription", "previews"],
+    "audio": ["summary", "transcription"],
+    "document": ["summary"],
 }
 
 
@@ -94,36 +98,47 @@ def process_file_event(event_data):
         logger.error(f"Aborting dispatch for asset_id: {asset_id} due to Firestore insertion failure.", extra=log_extra)
         return
 
-    # Get task configurations for this file type from the config map.
-    task_configs = FILE_TYPE_PROMPT_MAP.get(file_category, {})
+    # 2. Determine which tasks to dispatch based on file category.
+    tasks_to_dispatch = CATEGORY_TASK_MAP.get(file_category, [])
 
-    # 2. Dispatch to Task-Specific Topics
-    for task_name, topic_path in TOPIC_PATHS.items():
-        task_prompt_config = task_configs.get(task_name)
+    # 3. Dispatch messages for applicable tasks.
+    # The message payload is now simpler and the same for all tasks.
+    message_data = {
+        "asset_id": asset_id,
+        "file_location": file_location,
+    }
+    encoded_message = json.dumps(message_data).encode("utf-8")
 
-        # Check if the task is applicable for this file type and the topic is configured
-        if task_prompt_config and topic_path:
-            message_data = {
-                "asset_id": asset_id,
-                "file_location": file_location,
-                "prompt_config": task_prompt_config
-            }
+    for task_name in tasks_to_dispatch:
+        topic_path = TOPIC_PATHS.get(task_name)
+        if topic_path:
             try:
-                future = publisher.publish(topic_path, json.dumps(message_data).encode("utf-8"))
+                future = publisher.publish(topic_path, encoded_message)
                 message_id = future.result()
                 logger.info(f"Dispatched {task_name} for {asset_id}.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "message_id": message_id}})
                 asset_manager.update_asset_metadata(asset_id, task_name, {"status": "dispatched"})
             except Exception as e:
                 logger.error(f"Error dispatching {task_name} for {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
                 # Update Firestore status to reflect dispatch error
-                asset_manager.update_asset_metadata(asset_id, task_name, {
-                    "status": "dispatch_failed",
-                    "error_message": str(e)
-                })
+                asset_manager.update_asset_metadata(
+                    asset_id, task_name, {"status": "dispatch_failed", "error_message": str(e)}
+                )
         else:
-            # This is an expected outcome, so we log at INFO level.
-            # The status is already 'not_applicable' from the insert_asset call, so no need for an explicit update here.
-            logger.info(f"Skipping task '{task_name}' for file_category '{file_category}' (not applicable or topic config missing).", extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "file_category": file_category}})
+            logger.warning(f"Skipping task '{task_name}' because its topic is not configured.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+            asset_manager.update_asset_metadata(
+                asset_id, task_name, {"status": "not_applicable", "error_message": "Topic not configured in dispatcher."}
+            )
+
+    # 4. Mark non-dispatched tasks as 'not_applicable'.
+    # This corrects the initial 'pending' status set by insert_asset for tasks
+    # that don't apply to this file type (e.g., previews for audio).
+    all_possible_tasks = set(TOPIC_PATHS.keys())
+    dispatched_tasks = set(tasks_to_dispatch)
+    skipped_tasks = all_possible_tasks - dispatched_tasks
+
+    for task_name in skipped_tasks:
+        logger.info(f"Marking task '{task_name}' as not_applicable for file_category '{file_category}'.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+        asset_manager.update_asset_metadata(asset_id, task_name, {"status": "not_applicable"})
 
 
 @app.route("/", methods=["POST"])

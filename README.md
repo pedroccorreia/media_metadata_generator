@@ -27,7 +27,7 @@ The architecture is broken down into several logical layers, each with specific 
 
 This layer consists of multiple independent Cloud Run services that perform the actual metadata extraction using Gemini models.
 
-* **Summaries-Generator-Service:** Subscribes to the summaries topic, calls the Gemini API to generate text summaries and identify key sections (chapters), and updates the asset's document in Firestore.
+* **Summaries-Generator-Service:** Subscribes to the summaries topic. It calls the Gemini API with multiple prompts to generate a comprehensive analysis, including a main summary, itemized points, subject topics, and key sections/clips with timestamps. It then combines these results and updates the asset's document in Firestore.
 * **Transcription-Generator-Service:** Subscribes to the transcription topic, calls the Gemini API for audio transcription, and updates the Firestore document.
 * **Previews-Generator-Service:** Subscribes to the previews topic, calls the Gemini API to identify suitable segments for previews or short clips, and updates the Firestore document.
 
@@ -46,9 +46,25 @@ The data for each media asset is stored in the `media_assets` collection.
   "upload_time": "2025-08-05T10:00:00Z",
   "overall_status": "processing",
   "summary": {
-    "text": "...",
-    "chapters": [{"title": "...", "start_time": 0}],
     "status": "completed",
+    "summary": "A medium length summary of the video content...",
+    "itemized_summary": [
+      {"item": "First key point from the video."},
+      {"item": "Second key point from the video."}
+    ],
+    "subject_topics": [
+      {"topic": "Media Analysis"},
+      {"topic": "Generative AI"}
+    ],
+    "sections": [
+      {
+        "type": "highlight",
+        "start_time": "00:32",
+        "end_time": "01:15",
+        "reason": "This section contains the main argument."
+      }
+    ],
+    "error_message": null,
     "last_updated": "2025-08-05T10:05:00Z"
   },
   "transcription": {
