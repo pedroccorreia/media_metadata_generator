@@ -110,7 +110,7 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
     logger.info("Generating summary for asset: %s", asset_id,  extra=log_extra)
-
+    raw_response = ""
     try:
         system_instructions_text = """
          You are a skilled video analysis expert. 
@@ -120,7 +120,8 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
             Please analyze the following video and provide summary, itemized_summary and subject_topics.
             Please format your response as a JSON object with the given structure. 
             Avoid any additional comment or text.```
-            OUTPUT:```JSON
+            OUTPUT:```
+            JSON
             {
                 "summary": "[A medium length summary of the video content]",
                 "itemized_summary" : [{"[bullet item number 1]"}, {"[bullet item number 2]"}, {"[bullet item number 3 - no more]"}
@@ -138,11 +139,20 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
             }```
         """
         model = "gemini-2.5-flash"
-        summary_response = generate(prompt, file_location, system_instructions_text, model)
-        summary_data = json.loads(re.sub(r"json|```", "", summary_response))
+        raw_response = generate(prompt, file_location, system_instructions_text, model)
+        summary_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
 
         logger.info("Successfully generated summary text for asset %s",asset_id, extra=log_extra)
         return summary_data
+    except json.JSONDecodeError:
+        logger.error(
+            "Failed to decode JSON for summary on asset %s. Raw response: %s",
+            asset_id,
+            raw_response,
+            exc_info=True,
+            extra=log_extra
+        )
+        return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
         logger.error("Failed to generate summary/chapters for asset %s",asset_id, exc_info=True, extra=log_extra)
         return {"error": f"Failed to process with Gemini: {str(e)}"}
@@ -160,6 +170,7 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
     logger.info("Generating key sections for asset: %s", asset_id, extra=log_extra)
+    raw_response = ""
     try:
         # Define key section prompt
         prompt_content = """
@@ -168,7 +179,8 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
             Please format your response as a JSON object with the given structure. 
             Make sure the audio is not truncated while suggesting the clips. 
             Avoid any additional comment or text.
-                OUTPUT:```JSON
+                OUTPUT:```
+                JSON
                 {
                 \"sections\": [
                 {
@@ -195,11 +207,19 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         # Define a specific model so that the default one is not used
         model_name = "gemini-2.5-pro"
         # retrieve the result
-        key_sections_text = generate(prompt_content, file_location, system_instruction_text, model_name)
-        key_sections_data = json.loads(re.sub(r"json|```", "", key_sections_text))
+        raw_response = generate(prompt_content, file_location, system_instruction_text, model_name)
+        key_sections_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
         logger.info("Successfully generated key sections for asset %s", asset_id, extra=log_extra)
         return key_sections_data
-
+    except json.JSONDecodeError:
+        logger.error(
+            "Failed to decode JSON for key sections on asset %s. Raw response: %s",
+            asset_id,
+            raw_response,
+            exc_info=True,
+            extra=log_extra
+        )
+        return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
         logger.error(
             "Failed to generate key sections for asset %s", 
@@ -208,6 +228,121 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
             extra=log_extra)
         return {"error": f"Failed to process with Gemini: {str(e)}"}
 
+
+def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
+    """
+    Generates Detailed Categorization for a media asset using GenAI models.
+
+    Args:
+        asset_id (str): The ID of the asset.
+        file_location (str): GCS URI of the media file.
+    Returns:
+        dict: A dictionary containing the result of the categorizations prompt,
+              or an error dictionary if generation fails.
+    """
+    log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
+    logger.info("Generating detailed categorization for asset: %s", asset_id, extra=log_extra)
+    raw_response = ""
+    try:
+        # Define key section prompt
+        prompt_content = """
+        Create a detailed categorization of the movie or series title.
+
+        The categories and their content are are follows:
+
+        Character
+        This item should list the various roles of people within the story, such as victims, suspects, law enforcement, and witnesses. Each role should be clearly defined to understand their function in the narrative.
+
+        Concept
+        This should describe the core idea or the foundation of the story, indicating whether it's an original creation or based on existing material.
+
+        Scenario
+        This section should outline the main plot points and the overall structure of the story, including the central problem to be solved and the genre elements like mystery or intrigue.
+
+        Setting
+        This item should detail the time and location of the story, including both the general environment (e.g., small town, city) and specific places where key events occur. It should also specify the time period, such as the decade or century.
+
+        Subject
+        This section should define the primary topic and themes of the story, such as the type of crime or the lifestyle depicted.
+
+        Practice
+        This item should describe the procedural and professional elements of the story, such as the legal, investigative, or judicial processes that are central to the plot.
+
+        Theme
+        This should list the abstract concepts and ideas explored in the narrative, such as justice, conflict, morality, and human nature.
+
+        Video Mood
+        This section should describe the intended emotional and atmospheric tone of the story, using adjectives to convey the viewing experience, such as suspenseful, chilling, or powerful.
+
+        All entries under the categories have the maximum length of one sentence.
+
+        OUTPUT:```
+        JSON
+        {
+        "character": [
+            "entry1",
+            "entry2"
+        ],
+        "concept": [
+            "entry1",
+            "entry2"
+        ],
+        "scenario": [
+            "entry1",
+            "entry2"
+        ],
+        "setting": [
+            "entry1",
+            "entry2"
+        ],
+        "subject": [
+            "entry1",
+            "entry2"
+        ],
+        "practice": [
+            "entry1",
+            "entry2"
+        ],
+        "theme": [
+            "entry1",
+            "entry2"
+        ],
+        "video_mood": [
+            "entry1",
+            "entry2"
+        ]
+        }
+        ```
+            """
+        # Establish system instructions
+        system_instruction_text = """
+            You are a skilled video analysis expert. 
+            You have a deep understanding of media and can accurately identify key moments in a video. 
+            Your task is to analyze the provided video and extract all the moments clips. 
+            For each clip, you need to classify the type of moment and provide the precise start and end timestamps. """
+        # Define a specific model so that the default one is not used
+        model_name = "gemini-2.5-flash"
+        # retrieve the result
+        raw_response = generate(prompt_content, file_location, system_instruction_text, model_name)
+        detailed_categorization_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
+        logger.info("Successfully generated detailed categorization for asset %s", asset_id, extra=log_extra)
+        return detailed_categorization_data
+    except json.JSONDecodeError:
+        logger.error(
+            "Failed to decode JSON for detail categorization on asset %s. Raw response: %s",
+            asset_id,
+            raw_response,
+            exc_info=True,
+            extra=log_extra
+        )
+        return {"error": f"Malformed JSON response from model: {raw_response}"}
+    except Exception as e:
+        logger.error(
+            "Failed to generate detail categorization for asset %s", 
+            asset_id,
+            exc_info=True,
+            extra=log_extra)
+        return {"error": f"Failed to process with Gemini: {str(e)}"}
 
 @app.route("/", methods=["POST"])
 def handle_message():
@@ -260,6 +395,9 @@ def handle_message():
         summary_results = generate_summary(asset_id, file_location)
         # Obtains key sections
         key_sections_results = generate_key_sections(asset_id, file_location)
+        # Obtains detailed categorization
+        detailed_categorization_results = generate_asset_categorization(asset_id, file_location)
+
 
         # --- Consolidate results and handle partial failures ---
         combined_results = {}
@@ -267,6 +405,7 @@ def handle_message():
 
         summary_error = summary_results.get("error")
         sections_error = key_sections_results.get("error")
+        categorization_error = detailed_categorization_results.get("error")
 
         if summary_error:
             error_messages.append(f"SummaryError: {summary_error}")
@@ -282,14 +421,21 @@ def handle_message():
             combined_results.update(key_sections_results)
             logger.info("Successfully generated key sections for asset %s", asset_id, extra=log_extra)
 
+        if categorization_error:
+            error_messages.append(f"CategorizationError: {categorization_error}")
+            logger.warning("Detailed categorization failed for asset %s : %s", asset_id, categorization_error, extra=log_extra)
+        else:
+            combined_results.update(detailed_categorization_results)
+            logger.info("Successfully generated detailed categorization for asset %s", asset_id, extra=log_extra)
+
         if error_messages:
             status = "partial_success" if combined_results else "failed"
             combined_error_message = " | ".join(error_messages)
             update_data = {"status": status, **combined_results, "error_message": combined_error_message}
-            logger.error("Summary/sections generation for asset %s completed with status '%s'. Errors: %s", asset_id, status, combined_error_message, extra=log_extra)
+            logger.error("Summary/sections/categorization generation for asset %s completed with status '%s'. Errors: %s", asset_id, status, combined_error_message, extra=log_extra)
         else:
             update_data = {"status": "completed", **combined_results, "error_message": None}
-            logger.info("Successfully completed summary and key sections generation for asset: %s", asset_id, extra=log_extra)
+            logger.info("Successfully completed summary, key sections, and categorization generation for asset: %s", asset_id, extra=log_extra)
 
         asset_manager.update_asset_metadata(asset_id, "summary", update_data)
 
