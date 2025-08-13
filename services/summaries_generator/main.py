@@ -13,6 +13,7 @@ from flask import Flask, request
 
 from common.media_asset_manager import MediaAssetManager
 from common.logging_config import configure_logger
+from .structured_output_schema import SUMMARY_SCHEMA, KEY_SECTIONS_SCHEMA, ASSET_CATEGORIZATION_SCHEMA
 
 # Configure logger for the service
 configure_logger()
@@ -27,7 +28,7 @@ asset_manager = MediaAssetManager(project_id=project_id)
 app = Flask(__name__)
 
 
-def generate(prompt_text, video_uri, system_instruction_text, model_name="gemini-2.5-pro") -> str:
+def generate(prompt_text, video_uri, system_instruction_text, response_schema, model_name="gemini-2.5-pro") -> str:
     """"
     Common function that will execute the prompts as per the inputs and return the 
     result of the prompt
@@ -70,6 +71,8 @@ def generate(prompt_text, video_uri, system_instruction_text, model_name="gemini
         top_p = 1,
         seed = 0,
         max_output_tokens = 65535,
+        response_mime_type="application/json",
+        response_schema=response_schema,
         safety_settings = [types.SafetySetting(
         category="HARM_CATEGORY_HATE_SPEECH",
         threshold="OFF"
@@ -118,29 +121,11 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
          Your task is to analyze the provided video and extract key information. """
         prompt = """
             Please analyze the following video and provide summary, itemized_summary and subject_topics.
-            Please format your response as a JSON object with the given structure. 
-            Avoid any additional comment or text.```
-            OUTPUT:```
-            JSON
-            {
-                "summary": "[A medium length summary of the video content]",
-                "itemized_summary" : [{"[bullet item number 1]"}, {"[bullet item number 2]"}, {"[bullet item number 3 - no more]"}
-                ],
-                subject_topics : [
-                    {'topic1'}, {'topic2'}, {'topic3'}
-                ], 
-                people : [
-                    {'person' :'[name of the person that is mentioned]', 
-                    'role' : '[Description of how this person is relevant. Interviewer, interviewed, mentioned, etc.]'}, 
-                    {'person' :'[name of the person that is mentioned]', 
-                    'role':'[[Description of how this person is relevant. Interviewer, interviewed, mentioned, etc.]]'}
-                ] 
-
-            }```
+            Avoid any additional comment or text.
         """
         model = "gemini-2.5-flash"
-        raw_response = generate(prompt, file_location, system_instructions_text, model)
-        summary_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
+        raw_response = generate(prompt, file_location, system_instructions_text, SUMMARY_SCHEMA, model_name=model)
+        summary_data = json.loads(raw_response)
 
         logger.info("Successfully generated summary text for asset %s",asset_id, extra=log_extra)
         return summary_data
@@ -154,7 +139,10 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
         )
         return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
-        logger.error("Failed to generate summary/chapters for asset %s",asset_id, exc_info=True, extra=log_extra)
+        logger.error(
+            "Failed to generate summary/chapters for asset %s",asset_id, 
+            exc_info=True, 
+            extra=log_extra)
         return {"error": f"Failed to process with Gemini: {str(e)}"}
 
 def generate_key_sections(asset_id: str, file_location: str) -> dict:
@@ -179,25 +167,8 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
             Please format your response as a JSON object with the given structure. 
             Make sure the audio is not truncated while suggesting the clips. 
             Avoid any additional comment or text.
-                OUTPUT:```
-                JSON
-                {
-                \"sections\": [
-                {
-                    \"type\": \"[highlight type]\",
-                    \"start_time\": \"[mm:ss]\",
-                    \"end_time\": \"[mm:ss]\",
-                    \"reason\" : \"[description of this specific moment / clip]\"
-                },
-                {
-                    \"type\":\"[highlight type]\",
-                    \"start_time\": \"[mm:ss]\",
-                    \"end_time\": \"[mm:ss]\",
-                    \"reason\" : \"[description of this specific moment / clip]\"
-                }
-                ]
-                }```
-            Please make sure the timestamps are accurate and reflect the precise start and end of each clip."""
+            Please make sure the timestamps are accurate and reflect the precise start and end of each clip.
+            """
         # Establish system instructions
         system_instruction_text = """
             You are a skilled video analysis expert. 
@@ -207,8 +178,9 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         # Define a specific model so that the default one is not used
         model_name = "gemini-2.5-pro"
         # retrieve the result
-        raw_response = generate(prompt_content, file_location, system_instruction_text, model_name)
-        key_sections_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
+        raw_response = generate(prompt_content, file_location, system_instruction_text, KEY_SECTIONS_SCHEMA, model_name=model_name)
+        key_sections_data = json.loads(raw_response)
+
         logger.info("Successfully generated key sections for asset %s", asset_id, extra=log_extra)
         return key_sections_data
     except json.JSONDecodeError:
@@ -227,7 +199,6 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
             exc_info=True,
             extra=log_extra)
         return {"error": f"Failed to process with Gemini: {str(e)}"}
-
 
 def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
     """
@@ -274,46 +245,7 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
         Video Mood
         This section should describe the intended emotional and atmospheric tone of the story, using adjectives to convey the viewing experience, such as suspenseful, chilling, or powerful.
 
-        All entries under the categories have the maximum length of one sentence.
-
-        OUTPUT:```
-        JSON
-        {
-        "character": [
-            "entry1",
-            "entry2"
-        ],
-        "concept": [
-            "entry1",
-            "entry2"
-        ],
-        "scenario": [
-            "entry1",
-            "entry2"
-        ],
-        "setting": [
-            "entry1",
-            "entry2"
-        ],
-        "subject": [
-            "entry1",
-            "entry2"
-        ],
-        "practice": [
-            "entry1",
-            "entry2"
-        ],
-        "theme": [
-            "entry1",
-            "entry2"
-        ],
-        "video_mood": [
-            "entry1",
-            "entry2"
-        ]
-        }
-        ```
-            """
+        Do not have verbose description. Use single words when adding items to the result."""
         # Establish system instructions
         system_instruction_text = """
             You are a skilled video analysis expert. 
@@ -323,8 +255,10 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
         # Define a specific model so that the default one is not used
         model_name = "gemini-2.5-flash"
         # retrieve the result
-        raw_response = generate(prompt_content, file_location, system_instruction_text, model_name)
-        detailed_categorization_data = json.loads(re.sub(r"json|```|JSON", "", raw_response))
+        raw_response = generate(prompt_content, file_location, system_instruction_text, ASSET_CATEGORIZATION_SCHEMA, model_name=model_name)
+        detailed_categorization_data = json.loads(raw_response)
+
+
         logger.info("Successfully generated detailed categorization for asset %s", asset_id, extra=log_extra)
         return detailed_categorization_data
     except json.JSONDecodeError:
@@ -364,14 +298,15 @@ def handle_message():
         message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
+        file_name = message_data.get("file_name")
 
-        if not all([asset_id, file_location]):
+        if not all([asset_id, file_location, file_name]):
             logger.error(
-                "Message missing required data: asset_id or file_location.",
+                "Message missing required data: asset_id, file_location, or file_name.",
                 extra={"extra_fields": {"message_data": message_data}})
             return "Bad Request: missing required data", 400
         
-        log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
+        log_extra = {"extra_fields": {"asset_id": asset_id, "file_name": file_name, "file_location": file_location}}
         logger.info("Processing summary generation request for asset: %s", asset_id, extra=log_extra)
         # Fetch asset details from Firestore to get file_category and content_type
         asset_data = asset_manager.get_asset(asset_id)

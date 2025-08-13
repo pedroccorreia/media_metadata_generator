@@ -33,16 +33,16 @@ def generate_previews(asset_id: str, file_location: str, prompt_config: dict) ->
         dict: A dictionary containing preview information (e.g., list of GCS URIs for clips).
               Returns an empty dict if generation fails or is not applicable.
     """
-    logger.info(f"Simulating preview generation for asset: {asset_id}", extra={"extra_fields": {"asset_id": asset_id, "file_location": file_location, "prompt_config": prompt_config}})
+    logger.info("Simulating preview generation for asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id, "file_location": file_location, "prompt_config": prompt_config}})
 
     # Extract bucket and blob name from GCS URI
     if not file_location.startswith("gs://"):
-        logger.error(f"Invalid GCS URI format: {file_location}", extra={"extra_fields": {"asset_id": asset_id}})
+        logger.error("Invalid GCS URI format: %s", file_location, extra={"extra_fields": {"asset_id": asset_id}})
         return {}
 
     path_parts = file_location[len("gs://"):].split('/', 1)
     if len(path_parts) < 2:
-        logger.error(f"Invalid GCS URI format, no blob name: {file_location}", extra={"extra_fields": {"asset_id": asset_id}})
+        logger.error("Invalid GCS URI format, no blob name: %s", file_location, extra={"extra_fields": {"asset_id": asset_id}})
         return {}
     
     bucket_name, blob_name = path_parts
@@ -60,7 +60,7 @@ def generate_previews(asset_id: str, file_location: str, prompt_config: dict) ->
         preview_path = f"gs://{bucket_name}/previews/{asset_id}/preview_{i+1}.{preview_format}"
         previews.append(preview_path)
         
-    logger.info(f"Successfully simulated generation of {num_previews} previews for asset {asset_id}", extra={"extra_fields": {"asset_id": asset_id}})
+    logger.info("Successfully simulated generation of %s previews for asset %s", num_previews, asset_id, extra={"extra_fields": {"asset_id": asset_id}})
     
     return {"clips": previews}
 
@@ -82,13 +82,14 @@ def handle_message():
         message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
+        file_name = message_data.get("file_name")
         
-        if not all([asset_id, file_location]):
-            logger.error("Message missing required data: asset_id, file_location", extra={"extra_fields": {"message_data": message_data}})
+        if not all([asset_id, file_location, file_name]):
+            logger.error("Message missing required data: asset_id, file_location, or file_name", extra={"extra_fields": {"message_data": message_data}})
             return "Bad Request: missing required data", 400
         
-        log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
-        logger.info(f"Processing preview generation request for asset: {asset_id}", extra=log_extra)
+        log_extra = {"extra_fields": {"asset_id": asset_id, "file_name": file_name, "file_location": file_location}}
+        logger.info("Processing preview generation request for asset: %s", asset_id, extra=log_extra)
         
         asset_manager.update_asset_metadata(asset_id, "previews", {"status": "processing"})
         # TODO: no processing at this stage
@@ -102,7 +103,7 @@ def handle_message():
         #     update_data = {"status": "failed", "error_message": "Preview generation returned no results."}
         #     asset_manager.update_asset_metadata(asset_id, "previews", update_data)
         #     logger.error(f"Preview generation failed for asset: {asset_id}", extra=log_extra)
-        logger.info(f"Successfully completed preview generation for asset: {asset_id}", extra=log_extra)
+        logger.info("Successfully completed preview generation for asset: %s", asset_id, extra=log_extra)
         
         return '', 204
     except Exception as e:

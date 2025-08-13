@@ -1,5 +1,4 @@
-import os
-from datetime import datetime
+
 from google.cloud import firestore
 import logging
 from typing import Optional
@@ -27,7 +26,7 @@ class MediaAssetManager:
         # The root collection for all media assets.
         self.collection_path = "media_assets"
         self.media_assets_collection = self.db.collection(self.collection_path)
-        logger.info(f"Initialized MediaAssetManager for collection: {self.collection_path}")
+        logger.info("Initialized MediaAssetManager for collection: %s", self.collection_path)
 
     def _get_doc_ref(self, asset_id: str) -> firestore.DocumentReference:
         """
@@ -47,6 +46,7 @@ class MediaAssetManager:
         file_path: str,
         content_type: str,
         file_category: str,
+        file_name: str,
         public_url: Optional[str] = None,
         poster_url: str = "https://placehold.co/1280x720/000000/FFFFFF?text=Default+Poster",
         is_dummy: bool = False
@@ -59,6 +59,7 @@ class MediaAssetManager:
             file_path (str): GCS URI of the original media file.
             content_type (str): MIME type of the media file (e.g., "video/mp4").
             file_category (str): The category of the file (e.g., "video", "audio", "document").
+            file_name (str): The original name of the file.
             public_url (Optional[str], optional): Publicly accessible URL for the media file. Defaults to None.
             poster_url (str, optional): URL for a poster image. Defaults to a placeholder.
             is_dummy (bool, optional): Flag if this is dummy content. Defaults to False.
@@ -72,6 +73,7 @@ class MediaAssetManager:
         # Determine initial status for each sub-metadata based on file_category
         is_video_audio = file_category in ["video", "audio"]
         initial_data = {
+            "file_name": file_name,
             "file_path": file_path,
             "public_url": public_url,
             "content_type": content_type,
@@ -113,10 +115,10 @@ class MediaAssetManager:
 
         try:
             doc_ref.set(initial_data, merge=False) # Use merge=False for initial creation
-            logger.info(f"Successfully inserted asset: {asset_id}", extra={"extra_fields": {"asset_id": asset_id}})
+            logger.info("Successfully inserted asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
             return True
         except Exception as e:
-            logger.error(f"Error inserting asset {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+            logger.error("Error inserting asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return False
 
     def get_asset(self, asset_id: str) -> Optional[dict]:
@@ -134,13 +136,13 @@ class MediaAssetManager:
             doc = doc_ref.get()
             if doc.exists:
                 data = doc.to_dict()
-                logger.debug(f"Retrieved asset: {asset_id}", extra={"extra_fields": {"asset_id": asset_id}})
+                logger.debug("Retrieved asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
                 return data
             else:
-                logger.warning(f"Asset {asset_id} not found.", extra={"extra_fields": {"asset_id": asset_id}})
+                logger.warning("Asset %s not found.", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
                 return None
         except Exception as e:
-            logger.error(f"Error retrieving asset {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+            logger.error("Error retrieving asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return None
 
     def update_asset_metadata(
@@ -181,10 +183,10 @@ class MediaAssetManager:
 
         try:
             doc_ref.update(update_payload)
-            logger.info(f"Successfully updated '{metadata_type}' for asset: {asset_id}", extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
+            logger.info("Successfully updated '%s' for asset: %s", metadata_type, asset_id, extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
             return True
         except Exception as e:
-            logger.error(f"Error updating '{metadata_type}' for asset {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
+            logger.error("Error updating '%s' for asset %s", metadata_type, asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
             return False
 
     def delete_asset(self, asset_id: str) -> bool:
@@ -200,8 +202,8 @@ class MediaAssetManager:
         doc_ref = self._get_doc_ref(asset_id)
         try:
             doc_ref.delete()
-            logger.info(f"Successfully deleted asset: {asset_id}", extra={"extra_fields": {"asset_id": asset_id}})
+            logger.info("Successfully deleted asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
             return True
         except Exception as e:
-            logger.error(f"Error deleting asset {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+            logger.error("Error deleting asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return False

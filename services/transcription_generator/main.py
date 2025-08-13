@@ -32,7 +32,7 @@ def generate_transcription(asset_id: str, file_location: str) -> dict:
               Returns an empty dict if generation fails.
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
-    logger.info(f"Simulating transcription generation for asset: {asset_id}", extra=log_extra)
+    logger.info("Simulating transcription generation for asset: %s", asset_id, extra=log_extra)
 
     # --- Simulation Logic ---
     simulated_text = f"This is a simulated transcription for asset {asset_id}. The content discusses various aspects of media analysis and metadata generation."
@@ -66,13 +66,14 @@ def handle_message():
         message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
+        file_name = message_data.get("file_name")
 
-        if not all([asset_id, file_location]):
-            logger.error("Message missing required data: asset_id or file_location.", extra={"extra_fields": {"message_data": message_data}})
+        if not all([asset_id, file_location, file_name]):
+            logger.error("Message missing required data: asset_id, file_location or file_name.", extra={"extra_fields": {"message_data": message_data}})
             return "Bad Request: missing required data", 400
         
-        log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
-        logger.info(f"Processing transcription generation request for asset: {asset_id}", extra=log_extra)
+        log_extra = {"extra_fields": {"asset_id": asset_id, "file_name": file_name, "file_location": file_location}}
+        logger.info("Processing transcription generation request for asset: %s", asset_id, extra=log_extra)
         
         asset_manager.update_asset_metadata(asset_id, "transcription", {"status": "processing"})
         # TODO: No processing currently
@@ -80,7 +81,7 @@ def handle_message():
 
         # update_data = {"status": "completed", "text": transcription_results.get("text"), "words": transcription_results.get("words", []), "error_message": None}
         # asset_manager.update_asset_metadata(asset_id, "transcription", update_data)
-        logger.info(f"Successfully completed transcription generation for asset: {asset_id}", extra=log_extra)
+        logger.info("Successfully completed transcription generation for asset: %s", asset_id, extra=log_extra)
 
         return '', 204
     except Exception as e:

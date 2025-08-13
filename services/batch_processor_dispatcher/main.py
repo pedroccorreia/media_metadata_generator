@@ -35,10 +35,10 @@ if not all([project_id, SUMMARIES_TOPIC, TRANSCRIPTION_TOPIC, PREVIEWS_TOPIC]):
         }.items() if not val
     ]
     # This is a critical configuration error. The service cannot run without these.
-    logger.critical(f"Missing required environment variables: {', '.join(missing_vars)}. Shutting down.")
+    logger.critical("Missing required environment variables: %s. Shutting down.", ', '.join(missing_vars))
     exit(1) # In a container, this will cause it to exit and be restarted.
 
-logger.info(f"Booting up with the following env variables {project_id} | {SUMMARIES_TOPIC} | {TRANSCRIPTION_TOPIC} | {PREVIEWS_TOPIC}")
+logger.info("Booting up with the following env variables %s | %s | %s | %s", project_id, SUMMARIES_TOPIC, TRANSCRIPTION_TOPIC, PREVIEWS_TOPIC)
 
 publisher = pubsub_v1.PublisherClient()
 # MediaAssetManager setup
@@ -68,22 +68,24 @@ def process_file_event(event_data):
     content_type = event_data.get("content_type")
     asset_id = event_data.get("asset_id")
     file_category = event_data.get("file_category")
-    public_url = event_data.get("public_url") 
+    public_url = event_data.get("public_url")
+    file_name = event_data.get("file_name")
 
-    if not all([file_location, content_type, asset_id, file_category]):
+    if not all([file_location, content_type, asset_id, file_category, file_name]):
         logger.warning("Skipping invalid message due to missing fields.", extra={"extra_fields": {"event_data": event_data}})
         return
 
     log_extra = {
         "extra_fields": {
             "asset_id": asset_id,
+            "file_name": file_name,
             "file_category": file_category,
             "content_type": content_type,
             "file_location": file_location,
             "public_url": public_url
         }
     }
-    logger.info(f"Received event for asset_id: {asset_id}", extra=log_extra)
+    logger.info("Received event for asset_id: %s", asset_id, extra=log_extra)
 
     # 1. Create the initial asset record in Firestore using the manager.
     # This sets up the full document structure with 'pending' or 'not_applicable' statuses.
@@ -92,10 +94,11 @@ def process_file_event(event_data):
         file_path=file_location,
         content_type=content_type,
         file_category=file_category,
+        file_name=file_name,
         public_url=public_url,
     ):
         # The asset_manager already logs the detailed error.
-        logger.error(f"Aborting dispatch for asset_id: {asset_id} due to Firestore insertion failure.", extra=log_extra)
+        logger.error("Aborting dispatch for asset_id: %s due to Firestore insertion failure.", asset_id, extra=log_extra)
         return
 
     # 2. Determine which tasks to dispatch based on file category.
@@ -106,6 +109,7 @@ def process_file_event(event_data):
     message_data = {
         "asset_id": asset_id,
         "file_location": file_location,
+        "file_name": file_name,
     }
     encoded_message = json.dumps(message_data).encode("utf-8")
 
@@ -115,16 +119,16 @@ def process_file_event(event_data):
             try:
                 future = publisher.publish(topic_path, encoded_message)
                 message_id = future.result()
-                logger.info(f"Dispatched {task_name} for {asset_id}.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "message_id": message_id}})
+                logger.info("Dispatched %s for %s.", task_name, asset_id, extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "message_id": message_id}})
                 asset_manager.update_asset_metadata(asset_id, task_name, {"status": "dispatched"})
             except Exception as e:
-                logger.error(f"Error dispatching {task_name} for {asset_id}", exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+                logger.error("Error dispatching %s for %s", task_name, asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
                 # Update Firestore status to reflect dispatch error
                 asset_manager.update_asset_metadata(
                     asset_id, task_name, {"status": "dispatch_failed", "error_message": str(e)}
                 )
         else:
-            logger.warning(f"Skipping task '{task_name}' because its topic is not configured.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+            logger.warning("Skipping task '%s' because its topic is not configured.", task_name, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
             asset_manager.update_asset_metadata(
                 asset_id, task_name, {"status": "not_applicable", "error_message": "Topic not configured in dispatcher."}
             )
@@ -137,7 +141,7 @@ def process_file_event(event_data):
     skipped_tasks = all_possible_tasks - dispatched_tasks
 
     for task_name in skipped_tasks:
-        logger.info(f"Marking task '{task_name}' as not_applicable for file_category '{file_category}'.", extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+        logger.info("Marking task '%s' as not_applicable for file_category '%s'.", task_name, file_category, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
         asset_manager.update_asset_metadata(asset_id, task_name, {"status": "not_applicable"})
 
 
