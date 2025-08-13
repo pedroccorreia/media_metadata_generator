@@ -8,9 +8,9 @@ export AR_REPO_NAME="media-pipeline-images"
 
 # An array containing the names of the services.
 services=(
-    "summaries_generator"
+    # "summaries_generator"
     # "batch_processor_dispatcher"
-    # "previews_generator"
+    "previews_generator"
     # "transcription_generator"
 )
 

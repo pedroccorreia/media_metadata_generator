@@ -72,13 +72,15 @@ SUMMARY_SCHEMA = {
             "type": "ARRAY",
             "items": {
                 "type": "STRING"
-            }
+            },
+            "maxItems": 3
         },
         "subject_topics": {
             "type": "ARRAY",
             "items": {
                 "type": "STRING"
-            }
+            },
+            "maxItems": 5
         },
         "people": {
             "type": "ARRAY",
@@ -92,7 +94,8 @@ SUMMARY_SCHEMA = {
                         "type": "STRING"
                     }
                 }
-            }
+            },
+            "maxItems": 10
         }
     }
 }
