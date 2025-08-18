@@ -163,7 +163,7 @@ def handle_message():
         message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
         process_file_event(message_data)
         return '', 204 # Acknowledge the message
-    except Exception as e:
+    except Exception:
         logger.critical("Overall processing failed for Pub/Sub message.", exc_info=True, extra={"extra_fields": {"pubsub_message": pubsub_message}})
         # Acknowledge the message by returning a success code (204) to Pub/Sub.
         # This prevents the message from being retried, avoiding "poison pill" scenarios

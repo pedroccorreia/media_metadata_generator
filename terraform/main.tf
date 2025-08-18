@@ -10,7 +10,8 @@ resource "google_project_service" "apis" {
     "artifactregistry.googleapis.com", # Recommended for storing Docker images
     "cloudscheduler.googleapis.com",   # For optional batch processing trigger
     "cloudresourcemanager.googleapis.com", # Implicit, but good to ensure
-    "aiplatform.googleapis.com"       # For Vertex AI services
+    "aiplatform.googleapis.com",       # For Vertex AI services
+    "speech.googleapis.com"            # For Speech-to-Text API
   ])
   project = var.project_id
   service = each.key
@@ -110,9 +111,10 @@ resource "google_project_iam_member" "metadata_generator_pubsub_subscriber" {
   member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
 }
 
-resource "google_project_iam_member" "metadata_generator_gcs_viewer" {
+resource "google_project_iam_member" "metadata_generator_gcs_admin" {
   project = var.project_id
-  role    = "roles/storage.objectViewer"
+  # This role allows creating, reading, and deleting GCS objects.
+  role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
 }
 
@@ -127,6 +129,15 @@ resource "google_project_iam_member" "metadata_generator_aiplatform_user" {
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
+}
+
+resource "google_project_iam_member" "metadata_generator_speech_client" {
+  project = var.project_id
+  # The 'Speech Admin' role grants full control over Speech-to-Text resources.
+  # This is more permissive than required but will resolve the 'create' permission issue.
+  role    = "roles/speech.admin"
+  member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  depends_on = [google_project_service.apis["speech.googleapis.com"]]
 }
 
 # --- IAM Bindings for Pub/Sub to impersonate Service Accounts ---
@@ -284,9 +295,19 @@ resource "google_cloud_run_service" "transcription_generator" {
           name  = "GOOGLE_CLOUD_PROJECT"
           value = var.project_id
         }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+        resources {
+          limits = {
+            cpu    = "2"
+            memory = "8Gi"
+          }
+        }
       }
       container_concurrency = var.transcription_generator_concurrency
-      timeout_seconds = 1800 # 30 minutes, can be adjusted for long audio
+      timeout_seconds       = 1800 # 30 minutes, can be adjusted for long audio
     }
   }
   traffic {

@@ -1,7 +1,7 @@
 # Dockerfile.transcription_generator
 
 # Use a slim Python base image
-FROM python:3.9-slim-buster
+FROM python:3.9-slim-bullseye
 
 # Set environment variables
 ENV PYTHONUNBUFFERED True
@@ -9,6 +9,10 @@ ENV PYTHONPATH /app
 
 # Set the working directory inside the container
 WORKDIR /app
+
+# Install ffmpeg for audio extraction from video files
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy service-specific requirements and install them
 COPY transcription_generator/requirements.txt .

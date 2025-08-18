@@ -117,7 +117,7 @@ KEY_SECTIONS_SCHEMA = {
                     "end_time": {
                         "type": "STRING"
                     },
-                    "reason": {
+                    "summary": {
                         "type": "STRING"
                     }
                 }

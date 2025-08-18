@@ -10,8 +10,8 @@ export AR_REPO_NAME="media-pipeline-images"
 services=(
     # "summaries_generator"
     # "batch_processor_dispatcher"
-    "previews_generator"
-    # "transcription_generator"
+    # "previews_generator"
+    "transcription_generator"
 )
 
 # Loop through each service name in the 'services' array.
