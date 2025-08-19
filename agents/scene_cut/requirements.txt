@@ -1,0 +1,3 @@
+google-cloud-storage
+firebase-admin
+functions-framework # Only needed if deploying as a Google Cloud Function HTTP trigger

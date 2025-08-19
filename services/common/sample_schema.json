@@ -1,40 +1,92 @@
 {
-  "file_path": "gs://your-bucket/path/to/file.mp4",
-  "public_url": "https://storage.googleapis.com/your-bucket/path/to/file.mp4",
-  "content_type": "video/mp4", 
-  "upload_time": "2025-08-05T10:00:00Z",
-  "last_updated": "2025-08-05T10:00:00Z",
-  "poster_url": "https://placehold.co/1280x720/000000/FFFFFF?text=Default+Poster",
-  "is_dummy": false,
-
-  "summary": {
-    "status": "pending",
-    "text": "...",
-    "chapters": [], 
-    "error_message": null,
-    "last_updated": null
+  "content_type": "string",
+  "public_url": "string",
+  "upload_time": "string (ISO 8601 format)",
+  "file_path": "string",
+  "file_category": "string",
+  "last_updated": "string (ISO 8601 format)",
+  "video_details": {
+    "duration": "number",
+    "width": "number",
+    "height": "number"
   },
-
-  "transcription": {
-    "status": "pending",
-    "text": "...",
-    "language": "en-US",
-    "gcs_uri": "gs://your-transcription-output-bucket/transcriptions/asset_id.txt",
-    "error_message": null,
-    "last_updated": null
-  },
-
+  "is_dummy": "boolean",
+  "poster_url": "string",
+  "file_name": "string",
   "previews": {
-    "status": "pending",
-    "clips": [],
-    "error_message": null,
-    "last_updated": null
+    "last_updated": "string (ISO 8601 format)",
+    "error_message": "string (or null)",
+    "clips": [
+      {
+        "start_timecode": "string (timecode format, e.g., HH:MM:SS)",
+        "emotions_triggered": [
+          "string"
+        ],
+        "summary": "string",
+        "end_timecode": "string (timecode format, e.g., HH:MM:SS)",
+        "user_description": "string"
+      }
+    ],
+    "status": "string"
   },
-
-  "article_details": {
-    "author": "Jane Doe",
-    "publication_date": "2025-08-01",
-    "word_count": 1500,
-    "topics": ["AI", "Cloud Computing", "Machine Learning"]
+  "transcription": {
+    "language": "string (or null)",
+    "last_updated": "string (ISO 8601 format)",
+    "gcs_uri": "string (or null)",
+    "error_message": "string (or null)",
+    "status": "string",
+    "text": "string (or null)"
+  },
+  "summary": {
+    "last_updated": "string (ISO 8601 format)",
+    "status": "string",
+    "scenario": [
+      "string"
+    ],
+    "subject_topics": [
+      "string"
+    ],
+    "summary": "string",
+    "itemized_summary": [
+      "string"
+    ],
+    "video_mood": [
+      "string"
+    ],
+    "setting": [
+      "string"
+    ],
+    "subject": [
+      "string"
+    ],
+    "practice": [
+      "string"
+    ],
+    "character": [
+      {
+        "name": "string"
+      }
+    ],
+    "theme": [
+      "string"
+    ],
+    "concept": [
+      "string"
+    ],
+    "error_message": "string (or null)",
+    "sections": [
+      {
+        "start_time": "string (timecode format, e.g., HH:MM:SS)",
+        "end_time": "string (timecode format, e.g., HH:MM:SS)",
+        "summary": "string",
+        "type": "string"
+      }
+    ],
+    "people": [
+      {
+        "role": "string",
+        "person": "string"
+      }
+    ]
   }
 }
