@@ -140,6 +140,16 @@ resource "google_project_iam_member" "metadata_generator_speech_client" {
   depends_on = [google_project_service.apis["speech.googleapis.com"]]
 }
 
+# Grant the Vertex AI Service Agent permission to read from GCS buckets.
+# This is required for models like Gemini to process files directly from GCS URIs.
+resource "google_project_iam_member" "aiplatform_sa_gcs_reader" {
+  project    = var.project_id
+  role       = "roles/storage.objectViewer"
+  member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
+}
+
+
 # --- IAM Bindings for Pub/Sub to impersonate Service Accounts ---
 
 # Allow the Pub/Sub service account to create OIDC tokens for the SAs used in push subscriptions.
@@ -195,6 +205,7 @@ resource "google_cloud_run_service_iam_member" "previews_generator_pubsub_invoke
   member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.previews_generator]
 }
+
 
 # Data source to get project number for Pub/Sub service account
 data "google_project" "project" {

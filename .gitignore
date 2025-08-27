@@ -10,6 +10,7 @@ older/
 *.tfvars
 terraform/.terraform
 terraform/.terraform.lock.hcl
+terraform_*/
 
 # Exclude all json files that are not samples in the test folder
 test/*.json

@@ -43,7 +43,7 @@ def generate(prompt_text, video_uri, system_instruction_text, response_schema, m
     """
     client = genai.Client(
         vertexai=True,
-        project="fox-metadata-468100",
+        project=project_id,
         location="global",
     )
 

@@ -46,7 +46,7 @@ def generate(
     """
     client = genai.Client(
         vertexai=True,
-        project="fox-metadata-468100",
+        project=project_id,
         location="global",
     )
 

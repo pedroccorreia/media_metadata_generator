@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # This script automates the process of running 'artifact_publish.sh' for a predefined list of services.
-export GOOGLE_CLOUD_PROJECT="fox-metadata-468100"
+# It dynamically retrieves the current GCP project ID from the gcloud configuration.
+export GOOGLE_CLOUD_PROJECT=$(gcloud config get-value project)
 export GCP_REGION="us-central1"
 export AR_REPO_NAME="media-pipeline-images"
 
 
 # An array containing the names of the services.
 services=(
-    # "summaries_generator"
-    # "batch_processor_dispatcher"
-    # "previews_generator"
+    "summaries_generator"
+    "batch_processor_dispatcher"
+    "previews_generator"
     "transcription_generator"
 )
 
