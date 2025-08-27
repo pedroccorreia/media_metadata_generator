@@ -1,0 +1,22 @@
+# Local deploy shell script
+deploy.sh
+
+
+# Python Virtual Environment
+venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# VS Code / Cloud Shell Editor specific
+.vscode/
+
+# Terraform state and variables
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# Other system files
+.DS_Store
