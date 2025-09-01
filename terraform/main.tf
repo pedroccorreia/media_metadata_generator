@@ -28,8 +28,17 @@ resource "google_artifact_registry_repository" "docker_repo" {
   depends_on = [google_project_service.apis["artifactregistry.googleapis.com"]]
 }
 
+# Grant the Cloud Build service account permission to push images to the Artifact Registry.
+resource "google_artifact_registry_repository_iam_member" "cloudbuild_ar_writer" {
+  project    = google_artifact_registry_repository.docker_repo.project
+  location   = google_artifact_registry_repository.docker_repo.location
+  repository = google_artifact_registry_repository.docker_repo.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+  depends_on = [google_project_service.apis["cloudbuild.googleapis.com"]]
+}
+
 # --- GCS Buckets (Inputs) ---
-# Note: These buckets still exist, but no automatic notification to Pub/Sub is configured.
 resource "google_storage_bucket" "input_buckets" {
   for_each = toset(var.input_bucket_names)
   project  = var.project_id
@@ -147,6 +156,13 @@ resource "google_project_iam_member" "aiplatform_sa_gcs_reader" {
   role       = "roles/storage.objectViewer"
   member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
+}
+
+resource "google_project_iam_member" "pubsub_sa_log_writer" {
+  project    = var.project_id
+  role       = "roles/logging.logWriter"
+  member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  depends_on = [google_project_service.apis["pubsub.googleapis.com"]]
 }
 
 
