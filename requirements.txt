@@ -2,3 +2,36 @@ google-cloud-storage
 google-cloud-firestore
 moviepy
 functions-framework>=3.0.0
+
+# Core AI and Google Cloud dependencies
+google-generativeai
+google-genai
+google-cloud-storage
+google-cloud-aiplatform
+
+# Web framework
+flask
+flask-cors
+
+# Video processing and media handling
+ffmpeg-python
+
+# Additional dependencies for GCS video workflow
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+
+# Data processing and utilities
+requests
+Pillow
+python-dotenv
+
+# Type hints and development
+dataclasses
+
+# Development and testing
+IPython
+itables
+
+# Production server
+gunicorn==21.2.0
