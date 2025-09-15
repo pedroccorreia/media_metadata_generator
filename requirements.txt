@@ -1,0 +1,4 @@
+google-cloud-storage
+google-cloud-firestore
+moviepy
+functions-framework>=3.0.0
