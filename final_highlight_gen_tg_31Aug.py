@@ -18,6 +18,7 @@ from utils import (
     validate_timestamp_markers, 
     detect_segment_overlap)
 from get_video_gcs import download_from_gcs
+from google.cloud import storage
 
 
 from dotenv import load_dotenv
@@ -470,11 +471,66 @@ def create_highlight_reel(video_url: str,duration: int, model_id: str = 'gemini-
             output_file_name = f"highlight_{os.path.basename(video_url).split('.')[0]}.mp4"
             output_highlight_path = create_final_highlight_reel(segment_paths, output_path=output_file_name)
 
+            #Upload to GCS
             if output_highlight_path:
                 print(f"✓ Successfully created highlight reel: {output_highlight_path}")
+               
+                BUCKET_NAME = "fox-metadata-output"
+                DESTINATION_BLOB_NAME = f"video-highlights/{output_file_name}"
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(BUCKET_NAME)
+                blob = bucket.blob(DESTINATION_BLOB_NAME)
+                print(f"Uploading {output_highlight_path} to gs://{BUCKET_NAME}/{DESTINATION_BLOB_NAME}...")
+                blob.upload_from_filename(output_highlight_path)
+        
+                gcs_uri = f"gs://{BUCKET_NAME}/{DESTINATION_BLOB_NAME}"
+                print(f"✓ Successfully uploaded highlight to GCS: {gcs_uri}")
                 return {'success': True, 'output_path': output_highlight_path}
             else:
-                return {'success': False, 'error': 'Failed to create final highlight reel.'}
+                return {'success': False, 'error': 'Failed to create final highlight reel'}
+
+            
+
+
+    
+    # --- [NEW GCS UPLOAD CODE] ---
+    
+    # **1. Configuration**
+    # !!! DEFINE YOUR BUCKET NAME HERE !!!
+        BUCKET_NAME = " fox-metadata-output" 
+    
+        # Define a destination path/folder within the bucket
+        # This will result in: gs://your-gcs-bucket-name/video-highlights/highlight_your_video.mp4
+        DESTINATION_BLOB_NAME = f"video-highlights/{output_file_name}" 
+
+        try:
+            # **2. Initialize GCS Client**
+            # Assumes authentication is set up (e.g., Application Default Credentials)
+            storage_client = storage.Client()
+        
+            # **3. Get Bucket and Blob**
+            bucket = storage_client.bucket(BUCKET_NAME)
+            blob = bucket.blob(DESTINATION_BLOB_NAME)
+        
+            # **4. Upload the File**
+            print(f"Uploading {output_highlight_path} to gs://{BUCKET_NAME}/{DESTINATION_BLOB_NAME}...")
+            blob.upload_from_filename(output_highlight_path)
+        
+            gcs_uri = f"gs://{BUCKET_NAME}/{DESTINATION_BLOB_NAME}"
+            print(f"✓ Successfully uploaded highlight to GCS: {gcs_uri}")
+        
+            # **5. Update Return Value**
+            # Now returns the local path and the new GCS URI
+            return {'success': True, 'output_path': output_highlight_path, 'gcs_uri': gcs_uri}
+        
+        except Exception as e:
+            print(f"Error: Failed to upload file to GCS. {e}")
+            # Return a failure specific to the GCS upload
+            return {'success': False, 'error': f'Failed to upload to GCS: {e}'}
+    
+    # --- [END OF NEW GCS CODE] ---
+
+  
 
     except Exception as e:
         print(f"Error in create_highlight_reel: {e}")

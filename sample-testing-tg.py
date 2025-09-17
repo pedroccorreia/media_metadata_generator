@@ -86,8 +86,8 @@ def process_gcs_video_metadata(bucket_name, source_blob_name):
 # 5. Uncomment the lines below and replace with your specific bucket and video file path.
 
 if __name__ == "__main__":
-     your_bucket_name = "sample-ai-testing-bucket-tg"  # Replace with your GCS bucket name
-     your_video_path = "next25.mp4"
+     your_bucket_name = "fox-metadata-input"  # Replace with your GCS bucket name
+     your_video_path = "ncis_los_angeles.mp4"
      collection_name = "video_metadata"
      
      doc_id=process_gcs_video_metadata(your_bucket_name, your_video_path)
