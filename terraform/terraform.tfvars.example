@@ -1,0 +1,12 @@
+project_id = "sample-project"
+
+input_bucket_names = [
+  "sample-project-input"
+]
+
+
+# Define your Docker image URLs explicitly here
+batch_processor_image      = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/batch_processor_dispatcher:latest"
+summaries_generator_image  = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/summaries_generator:latest"
+transcription_generator_image = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/transcription_generator:latest"
+previews_generator_image   = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/previews_generator:latest"

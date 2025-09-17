@@ -1,19 +1,30 @@
+"""
+The Batch Processor Dispatcher Service.
+
+This Cloud Run service acts as the central entry point for the media processing pipeline.
+It subscribes to a central Pub/Sub topic where new file events are published.
+Upon receiving a message, it creates a metadata record in Firestore for the new asset
+and then dispatches individual processing tasks (e.g., summary, transcription) to other
+downstream services by publishing messages to task-specific Pub/Sub topics.
+"""
+
 import os
 import json
 import base64
 import logging
+
 from common.logging_config import configure_logger
-from flask import Flask, request
-from google.cloud import pubsub_v1
 from common.media_asset_manager import MediaAssetManager
 
+from flask import Flask, request
+from google.cloud import pubsub_v1
 
 
-#Logging setup
+# Logging setup
 configure_logger()
 # Get a logger instance for this specific module.
 # It will inherit the configuration set by configure_logger()
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger(__name__)
 
 # Pub/Sub setup
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
@@ -27,27 +38,46 @@ PREVIEWS_TOPIC = os.environ.get("PUBSUB_TOPIC_PREVIEWS")
 # from running in a misconfigured state.
 if not all([project_id, SUMMARIES_TOPIC, TRANSCRIPTION_TOPIC, PREVIEWS_TOPIC]):
     missing_vars = [
-        var for var, val in {
+        var
+        for var, val in {
             "GOOGLE_CLOUD_PROJECT": project_id,
             "PUBSUB_TOPIC_SUMMARIES": SUMMARIES_TOPIC,
             "PUBSUB_TOPIC_TRANSCRIPTION": TRANSCRIPTION_TOPIC,
             "PUBSUB_TOPIC_PREVIEWS": PREVIEWS_TOPIC,
-        }.items() if not val
+        }.items()
+        if not val
     ]
     # This is a critical configuration error. The service cannot run without these.
-    logger.critical("Missing required environment variables: %s. Shutting down.", ', '.join(missing_vars))
-    exit(1) # In a container, this will cause it to exit and be restarted.
+    logger.critical(
+        "Missing required environment variables: %s. Shutting down.",
+        ", ".join(missing_vars),
+    )
+    exit(1)  # In a container, this will cause it to exit and be restarted.
 
-logger.info("Booting up with the following env variables %s | %s | %s | %s", project_id, SUMMARIES_TOPIC, TRANSCRIPTION_TOPIC, PREVIEWS_TOPIC)
+logger.info(
+    "Booting up with the following env variables %s | %s | %s | %s",
+    project_id,
+    SUMMARIES_TOPIC,
+    TRANSCRIPTION_TOPIC,
+    PREVIEWS_TOPIC,
+)
 
 publisher = pubsub_v1.PublisherClient()
 # MediaAssetManager setup
 asset_manager = MediaAssetManager(project_id=project_id)
 # Pre-format the full topic paths for efficiency
 TOPIC_PATHS = {
-    "summary": publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None,
-    "transcription": publisher.topic_path(project_id, TRANSCRIPTION_TOPIC) if TRANSCRIPTION_TOPIC else None,
-    "previews": publisher.topic_path(project_id, PREVIEWS_TOPIC) if PREVIEWS_TOPIC else None,
+    "summary": (
+        publisher.topic_path(project_id, SUMMARIES_TOPIC) if SUMMARIES_TOPIC else None
+    ),
+    "transcription": (
+        publisher.topic_path(project_id, TRANSCRIPTION_TOPIC)
+        if TRANSCRIPTION_TOPIC
+        else None
+    ),
+    "previews": (
+        publisher.topic_path(project_id, PREVIEWS_TOPIC) if PREVIEWS_TOPIC else None
+    ),
 }
 
 # Defines which tasks are applicable for each file category.
@@ -60,9 +90,22 @@ CATEGORY_TASK_MAP = {
 
 app = Flask(__name__)
 
+
 def process_file_event(event_data):
     """
-    Processes a single file event to dispatch metadata generation tasks.
+    Processes a file event, creates a Firestore record, and dispatches tasks.
+
+    This is the core logic of the dispatcher. It performs the following steps:
+    1. Validates the incoming message data.
+    2. Creates a new asset document in Firestore with initial 'pending' statuses.
+    3. Determines which processing tasks (summary, transcription, etc.) are
+       applicable based on the file's category (e.g., video, audio).
+    4. Publishes messages to the appropriate Pub/Sub topics for each task.
+    5. Updates the asset's status in Firestore to 'dispatched' for each task.
+    6. Marks non-applicable tasks as 'not_applicable' in Firestore.
+
+    Args:
+        event_data (dict): The parsed data from the Pub/Sub message.
     """
     file_location = event_data.get("file_location")
     content_type = event_data.get("content_type")
@@ -72,7 +115,10 @@ def process_file_event(event_data):
     file_name = event_data.get("file_name")
 
     if not all([file_location, content_type, asset_id, file_category, file_name]):
-        logger.warning("Skipping invalid message due to missing fields.", extra={"extra_fields": {"event_data": event_data}})
+        logger.warning(
+            "Skipping invalid message due to missing fields.",
+            extra={"extra_fields": {"event_data": event_data}},
+        )
         return
 
     log_extra = {
@@ -82,7 +128,7 @@ def process_file_event(event_data):
             "file_category": file_category,
             "content_type": content_type,
             "file_location": file_location,
-            "public_url": public_url
+            "public_url": public_url,
         }
     }
     logger.info("Received event for asset_id: %s", asset_id, extra=log_extra)
@@ -98,7 +144,11 @@ def process_file_event(event_data):
         public_url=public_url,
     ):
         # The asset_manager already logs the detailed error.
-        logger.error("Aborting dispatch for asset_id: %s due to Firestore insertion failure.", asset_id, extra=log_extra)
+        logger.error(
+            "Aborting dispatch for asset_id: %s due to Firestore insertion failure.",
+            asset_id,
+            extra=log_extra,
+        )
         return
 
     # 2. Determine which tasks to dispatch based on file category.
@@ -119,18 +169,48 @@ def process_file_event(event_data):
             try:
                 future = publisher.publish(topic_path, encoded_message)
                 message_id = future.result()
-                logger.info("Dispatched %s for %s.", task_name, asset_id, extra={"extra_fields": {"asset_id": asset_id, "task": task_name, "message_id": message_id}})
-                asset_manager.update_asset_metadata(asset_id, task_name, {"status": "dispatched"})
+                logger.info(
+                    "Dispatched %s for %s.",
+                    task_name,
+                    asset_id,
+                    extra={
+                        "extra_fields": {
+                            "asset_id": asset_id,
+                            "task": task_name,
+                            "message_id": message_id,
+                        }
+                    },
+                )
+                asset_manager.update_asset_metadata(
+                    asset_id, task_name, {"status": "dispatched"}
+                )
             except Exception as e:
-                logger.error("Error dispatching %s for %s", task_name, asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+                logger.error(
+                    "Error dispatching %s for %s",
+                    task_name,
+                    asset_id,
+                    exc_info=True,
+                    extra={"extra_fields": {"asset_id": asset_id, "task": task_name}},
+                )
                 # Update Firestore status to reflect dispatch error
                 asset_manager.update_asset_metadata(
-                    asset_id, task_name, {"status": "dispatch_failed", "error_message": str(e)}
+                    asset_id,
+                    task_name,
+                    {"status": "dispatch_failed", "error_message": str(e)},
                 )
         else:
-            logger.warning("Skipping task '%s' because its topic is not configured.", task_name, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
+            logger.warning(
+                "Skipping task '%s' because its topic is not configured.",
+                task_name,
+                extra={"extra_fields": {"asset_id": asset_id, "task": task_name}},
+            )
             asset_manager.update_asset_metadata(
-                asset_id, task_name, {"status": "not_applicable", "error_message": "Topic not configured in dispatcher."}
+                asset_id,
+                task_name,
+                {
+                    "status": "not_applicable",
+                    "error_message": "Topic not configured in dispatcher.",
+                },
             )
 
     # 4. Mark non-dispatched tasks as 'not_applicable'.
@@ -141,30 +221,48 @@ def process_file_event(event_data):
     skipped_tasks = all_possible_tasks - dispatched_tasks
 
     for task_name in skipped_tasks:
-        logger.info("Marking task '%s' as not_applicable for file_category '%s'.", task_name, file_category, extra={"extra_fields": {"asset_id": asset_id, "task": task_name}})
-        asset_manager.update_asset_metadata(asset_id, task_name, {"status": "not_applicable"})
+        logger.info(
+            "Marking task '%s' as not_applicable for file_category '%s'.",
+            task_name,
+            file_category,
+            extra={"extra_fields": {"asset_id": asset_id, "task": task_name}},
+        )
+        asset_manager.update_asset_metadata(
+            asset_id, task_name, {"status": "not_applicable"}
+        )
 
 
 @app.route("/", methods=["POST"])
 def handle_message():
     """
     Cloud Run entry point for Pub/Sub push messages.
+
+    This function is triggered when a message is pushed to the subscription
+    associated with this service. It decodes the message, extracts the data,
+    and passes it to `process_file_event` for handling. It includes robust
+    error handling to prevent message retries for non-recoverable errors.
     """
     request_json = request.get_json(silent=True)
-    if not request_json or not 'message' in request_json:
+    if not request_json or not "message" in request_json:
         logger.warning("Invalid Pub/Sub message format. Request missing 'message' key.")
-        return 'Bad Request: invalid Pub/Sub message format', 400
+        return "Bad Request: invalid Pub/Sub message format", 400
 
-    pubsub_message = request_json['message']
+    pubsub_message = request_json["message"]
     try:
         # The 'data' field is a base64-encoded string.
         # 1. Decode the base64 string to get the raw UTF-8 bytes.
         # 2. Decode the UTF-8 bytes to get the JSON string, then parse it.
-        message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
+        message_data = json.loads(
+            base64.b64decode(pubsub_message["data"]).decode("utf-8")
+        )
         process_file_event(message_data)
-        return '', 204 # Acknowledge the message
+        return "", 204  # Acknowledge the message
     except Exception:
-        logger.critical("Overall processing failed for Pub/Sub message.", exc_info=True, extra={"extra_fields": {"pubsub_message": pubsub_message}})
+        logger.critical(
+            "Overall processing failed for Pub/Sub message.",
+            exc_info=True,
+            extra={"extra_fields": {"pubsub_message": pubsub_message}},
+        )
         # Acknowledge the message by returning a success code (204) to Pub/Sub.
         # This prevents the message from being retried, avoiding "poison pill" scenarios
         # where a malformed message could cause an infinite retry loop.

@@ -4,7 +4,7 @@ import os
 import json
 import base64
 import logging
-import re
+
 
 from google import genai
 from google.genai import types
@@ -13,7 +13,11 @@ from flask import Flask, request
 
 from common.media_asset_manager import MediaAssetManager
 from common.logging_config import configure_logger
-from .structured_output_schema import SUMMARY_SCHEMA, KEY_SECTIONS_SCHEMA, ASSET_CATEGORIZATION_SCHEMA
+from .structured_output_schema import (
+    SUMMARY_SCHEMA,
+    KEY_SECTIONS_SCHEMA,
+    ASSET_CATEGORIZATION_SCHEMA,
+)
 
 # Configure logger for the service
 configure_logger()
@@ -28,9 +32,15 @@ asset_manager = MediaAssetManager(project_id=project_id)
 app = Flask(__name__)
 
 
-def generate(prompt_text, video_uri, system_instruction_text, response_schema, model_name="gemini-2.5-pro") -> str:
-    """"
-    Common function that will execute the prompts as per the inputs and return the 
+def generate(
+    prompt_text,
+    video_uri,
+    system_instruction_text,
+    response_schema,
+    model_name="gemini-2.5-pro",
+) -> str:
+    """ "
+    Common function that will execute the prompts as per the inputs and return the
     result of the prompt
     Args:
         prompt_text (str): The text prompt for the model.
@@ -57,53 +67,45 @@ def generate(prompt_text, video_uri, system_instruction_text, response_schema, m
     si_text1 = system_instruction_text
 
     contents = [
-        types.Content(
-        role="user",
-        parts=[
-            msg1_text1,
-            msg1_video1
-        ]
-        ),
+        types.Content(role="user", parts=[msg1_text1, msg1_video1]),
     ]
 
     generate_content_config = types.GenerateContentConfig(
-        temperature = 1,
-        top_p = 1,
-        seed = 0,
-        max_output_tokens = 65535,
+        temperature=1,
+        top_p=1,
+        seed=0,
+        max_output_tokens=65535,
         response_mime_type="application/json",
         response_schema=response_schema,
-        safety_settings = [types.SafetySetting(
-        category="HARM_CATEGORY_HATE_SPEECH",
-        threshold="OFF"
-        ),types.SafetySetting(
-        category="HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold="OFF"
-        ),types.SafetySetting(
-        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold="OFF"
-        ),types.SafetySetting(
-        category="HARM_CATEGORY_HARASSMENT",
-        threshold="OFF"
-        )],
+        safety_settings=[
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
+            types.SafetySetting(
+                category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"
+            ),
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
+        ],
         system_instruction=[types.Part.from_text(text=si_text1)],
         thinking_config=types.ThinkingConfig(
-        thinking_budget=-1,
+            thinking_budget=-1,
         ),
     )
 
     response = client.models.generate_content(
-        model = model_name,
-        contents = contents,
-        config = generate_content_config,
+        model=model_name,
+        contents=contents,
+        config=generate_content_config,
     )
 
     return response.text
 
+
 def generate_summary(asset_id: str, file_location: str) -> dict:
     """
     Generates a summary for a media asset using GenAI models.
-    
+
     Args:
         asset_id (str): The ID of the asset.
         file_location (str): GCS URI of the media file.
@@ -112,7 +114,7 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
               or an error dictionary if generation fails.
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
-    logger.info("Generating summary for asset: %s", asset_id,  extra=log_extra)
+    logger.info("Generating summary for asset: %s", asset_id, extra=log_extra)
     raw_response = ""
     try:
         system_instructions_text = """
@@ -124,10 +126,20 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
             Avoid any additional comment or text.
         """
         model = "gemini-2.5-flash"
-        raw_response = generate(prompt, file_location, system_instructions_text, SUMMARY_SCHEMA, model_name=model)
+        raw_response = generate(
+            prompt,
+            file_location,
+            system_instructions_text,
+            SUMMARY_SCHEMA,
+            model_name=model,
+        )
         summary_data = json.loads(raw_response)
 
-        logger.info("Successfully generated summary text for asset %s",asset_id, extra=log_extra)
+        logger.info(
+            "Successfully generated summary text for asset %s",
+            asset_id,
+            extra=log_extra,
+        )
         return summary_data
     except json.JSONDecodeError:
         logger.error(
@@ -135,15 +147,18 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
             asset_id,
             raw_response,
             exc_info=True,
-            extra=log_extra
+            extra=log_extra,
         )
         return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
         logger.error(
-            "Failed to generate summary/chapters for asset %s",asset_id, 
-            exc_info=True, 
-            extra=log_extra)
+            "Failed to generate summary/chapters for asset %s",
+            asset_id,
+            exc_info=True,
+            extra=log_extra,
+        )
         return {"error": f"Failed to process with Gemini: {str(e)}"}
+
 
 def generate_key_sections(asset_id: str, file_location: str) -> dict:
     """
@@ -178,10 +193,20 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         # Define a specific model so that the default one is not used
         model_name = "gemini-2.5-pro"
         # retrieve the result
-        raw_response = generate(prompt_content, file_location, system_instruction_text, KEY_SECTIONS_SCHEMA, model_name=model_name)
+        raw_response = generate(
+            prompt_content,
+            file_location,
+            system_instruction_text,
+            KEY_SECTIONS_SCHEMA,
+            model_name=model_name,
+        )
         key_sections_data = json.loads(raw_response)
 
-        logger.info("Successfully generated key sections for asset %s", asset_id, extra=log_extra)
+        logger.info(
+            "Successfully generated key sections for asset %s",
+            asset_id,
+            extra=log_extra,
+        )
         return key_sections_data
     except json.JSONDecodeError:
         logger.error(
@@ -189,16 +214,18 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
             asset_id,
             raw_response,
             exc_info=True,
-            extra=log_extra
+            extra=log_extra,
         )
         return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
         logger.error(
-            "Failed to generate key sections for asset %s", 
+            "Failed to generate key sections for asset %s",
             asset_id,
             exc_info=True,
-            extra=log_extra)
+            extra=log_extra,
+        )
         return {"error": f"Failed to process with Gemini: {str(e)}"}
+
 
 def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
     """
@@ -212,7 +239,9 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
               or an error dictionary if generation fails.
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": file_location}}
-    logger.info("Generating detailed categorization for asset: %s", asset_id, extra=log_extra)
+    logger.info(
+        "Generating detailed categorization for asset: %s", asset_id, extra=log_extra
+    )
     raw_response = ""
     try:
         # Define key section prompt
@@ -255,11 +284,20 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
         # Define a specific model so that the default one is not used
         model_name = "gemini-2.5-flash"
         # retrieve the result
-        raw_response = generate(prompt_content, file_location, system_instruction_text, ASSET_CATEGORIZATION_SCHEMA, model_name=model_name)
+        raw_response = generate(
+            prompt_content,
+            file_location,
+            system_instruction_text,
+            ASSET_CATEGORIZATION_SCHEMA,
+            model_name=model_name,
+        )
         detailed_categorization_data = json.loads(raw_response)
 
-
-        logger.info("Successfully generated detailed categorization for asset %s", asset_id, extra=log_extra)
+        logger.info(
+            "Successfully generated detailed categorization for asset %s",
+            asset_id,
+            extra=log_extra,
+        )
         return detailed_categorization_data
     except json.JSONDecodeError:
         logger.error(
@@ -267,16 +305,18 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
             asset_id,
             raw_response,
             exc_info=True,
-            extra=log_extra
+            extra=log_extra,
         )
         return {"error": f"Malformed JSON response from model: {raw_response}"}
     except Exception as e:
         logger.error(
-            "Failed to generate detail categorization for asset %s", 
+            "Failed to generate detail categorization for asset %s",
             asset_id,
             exc_info=True,
-            extra=log_extra)
+            extra=log_extra,
+        )
         return {"error": f"Failed to process with Gemini: {str(e)}"}
+
 
 @app.route("/", methods=["POST"])
 def handle_message():
@@ -286,16 +326,18 @@ def handle_message():
 
     # Checks if message is in the post input
     request_json = request.get_json(silent=True)
-    if not request_json or 'message' not in request_json:
+    if not request_json or "message" not in request_json:
         logger.error("Invalid Pub/Sub message format: missing 'message' key.")
-        return 'Bad Request: invalid Pub/Sub message format', 400
+        return "Bad Request: invalid Pub/Sub message format", 400
 
-    pubsub_message = request_json['message']
+    pubsub_message = request_json["message"]
     asset_id = None  # Initialize asset_id for error logging
 
     try:
         # Extract basic information from message
-        message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
+        message_data = json.loads(
+            base64.b64decode(pubsub_message["data"]).decode("utf-8")
+        )
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
@@ -303,36 +345,54 @@ def handle_message():
         if not all([asset_id, file_location, file_name]):
             logger.error(
                 "Message missing required data: asset_id, file_location, or file_name.",
-                extra={"extra_fields": {"message_data": message_data}})
+                extra={"extra_fields": {"message_data": message_data}},
+            )
             return "Bad Request: missing required data", 400
-        
-        log_extra = {"extra_fields": {"asset_id": asset_id, "file_name": file_name, "file_location": file_location}}
-        logger.info("Processing summary generation request for asset: %s", asset_id, extra=log_extra)
+
+        log_extra = {
+            "extra_fields": {
+                "asset_id": asset_id,
+                "file_name": file_name,
+                "file_location": file_location,
+            }
+        }
+        logger.info(
+            "Processing summary generation request for asset: %s",
+            asset_id,
+            extra=log_extra,
+        )
         # Fetch asset details from Firestore to get file_category and content_type
         asset_data = asset_manager.get_asset(asset_id)
         if not asset_data:
-            logger.error("Asset %s not found in Firestore. Aborting.", asset_id, extra=log_extra)
+            logger.error(
+                "Asset %s not found in Firestore. Aborting.", asset_id, extra=log_extra
+            )
             # Acknowledge to prevent retries for a non-existent asset
-            return '', 204
-        
+            return "", 204
+
         file_category = asset_data.get("file_category")
         content_type = asset_data.get("content_type")
 
         if not all([file_category, content_type]):
             error_msg = "Asset document in Firestore is missing 'file_category' or 'content_type'."
             logger.error(error_msg, extra=log_extra)
-            asset_manager.update_asset_metadata(asset_id, "summary", {"status": "failed", "error_message": error_msg})
-            return '', 204
+            asset_manager.update_asset_metadata(
+                asset_id, "summary", {"status": "failed", "error_message": error_msg}
+            )
+            return "", 204
 
-        asset_manager.update_asset_metadata(asset_id, "summary", {"status": "processing"})
+        asset_manager.update_asset_metadata(
+            asset_id, "summary", {"status": "processing"}
+        )
 
         # Generate both summary from asset
         summary_results = generate_summary(asset_id, file_location)
         # Obtains key sections
         key_sections_results = generate_key_sections(asset_id, file_location)
         # Obtains detailed categorization
-        detailed_categorization_results = generate_asset_categorization(asset_id, file_location)
-
+        detailed_categorization_results = generate_asset_categorization(
+            asset_id, file_location
+        )
 
         # --- Consolidate results and handle partial failures ---
         combined_results = {}
@@ -344,39 +404,93 @@ def handle_message():
 
         if summary_error:
             error_messages.append(f"SummaryError: {summary_error}")
-            logger.warning("Summary generation failed for asset %s: %s", asset_id, summary_error, extra=log_extra)
+            logger.warning(
+                "Summary generation failed for asset %s: %s",
+                asset_id,
+                summary_error,
+                extra=log_extra,
+            )
         else:
             combined_results.update(summary_results)
-            logger.info("Successfully generated summary for asset %s", asset_id, extra=log_extra)
+            logger.info(
+                "Successfully generated summary for asset %s", asset_id, extra=log_extra
+            )
 
         if sections_error:
             error_messages.append(f"KeySectionsError: {sections_error}")
-            logger.warning("Key sections generation failed for asset %s : %s", asset_id, sections_error, extra=log_extra)
+            logger.warning(
+                "Key sections generation failed for asset %s : %s",
+                asset_id,
+                sections_error,
+                extra=log_extra,
+            )
         else:
             combined_results.update(key_sections_results)
-            logger.info("Successfully generated key sections for asset %s", asset_id, extra=log_extra)
+            logger.info(
+                "Successfully generated key sections for asset %s",
+                asset_id,
+                extra=log_extra,
+            )
 
         if categorization_error:
             error_messages.append(f"CategorizationError: {categorization_error}")
-            logger.warning("Detailed categorization failed for asset %s : %s", asset_id, categorization_error, extra=log_extra)
+            logger.warning(
+                "Detailed categorization failed for asset %s : %s",
+                asset_id,
+                categorization_error,
+                extra=log_extra,
+            )
         else:
             combined_results.update(detailed_categorization_results)
-            logger.info("Successfully generated detailed categorization for asset %s", asset_id, extra=log_extra)
+            logger.info(
+                "Successfully generated detailed categorization for asset %s",
+                asset_id,
+                extra=log_extra,
+            )
 
         if error_messages:
             status = "partial_success" if combined_results else "failed"
             combined_error_message = " | ".join(error_messages)
-            update_data = {"status": status, **combined_results, "error_message": combined_error_message}
-            logger.error("Summary/sections/categorization generation for asset %s completed with status '%s'. Errors: %s", asset_id, status, combined_error_message, extra=log_extra)
+            update_data = {
+                "status": status,
+                **combined_results,
+                "error_message": combined_error_message,
+            }
+            logger.error(
+                "Summary/sections/categorization generation for asset %s completed with status '%s'. Errors: %s",
+                asset_id,
+                status,
+                combined_error_message,
+                extra=log_extra,
+            )
         else:
-            update_data = {"status": "completed", **combined_results, "error_message": None}
-            logger.info("Successfully completed summary, key sections, and categorization generation for asset: %s", asset_id, extra=log_extra)
+            update_data = {
+                "status": "completed",
+                **combined_results,
+                "error_message": None,
+            }
+            logger.info(
+                "Successfully completed summary, key sections, and categorization generation for asset: %s",
+                asset_id,
+                extra=log_extra,
+            )
 
         asset_manager.update_asset_metadata(asset_id, "summary", update_data)
 
-        return '', 204
+        return "", 204
     except Exception as e:
-        logger.critical("Unhandled exception during summary generation.", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+        logger.critical(
+            "Unhandled exception during summary generation.",
+            exc_info=True,
+            extra={"extra_fields": {"asset_id": asset_id}},
+        )
         if asset_id:
-            asset_manager.update_asset_metadata(asset_id, "summary", {"status": "failed", "error_message": f"Critical error in service: {str(e)}"})
+            asset_manager.update_asset_metadata(
+                asset_id,
+                "summary",
+                {
+                    "status": "failed",
+                    "error_message": f"Critical error in service: {str(e)}",
+                },
+            )
         return "Error processing message, but acknowledging to prevent retries.", 204

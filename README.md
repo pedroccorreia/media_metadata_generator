@@ -1,103 +1,145 @@
-# GCP Metadata Pipeline Architecture
+# Media Metadata Generator
 
-This document outlines a serverless, scalable, and resilient pipeline for ingesting media files, generating various types of metadata using the Gemini API, and storing the results in a flexible format for consumption by APIs and frontend applications.
+This project is a scalable, event-driven pipeline built on Google Cloud to automatically generate rich metadata for media files. When a video, audio, or document file is uploaded to a Google Cloud Storage (GCS) bucket, this system triggers a series of serverless Cloud Run services to generate:
 
-## Architecture Diagram
+-   **Summaries & Chapters**: Using Vertex AI's Gemini models.
+-   **Transcriptions**: Using the Google Cloud Speech-to-Text API.
+-   **Video Previews/Shorts**: Using Vertex AI's Gemini models to identify key scenes.
 
-The following diagram illustrates the flow of data through the pipeline's various layers and services.
+All generated metadata is stored and managed in a central Firestore database.
 
-## Pipeline Components
+## Architecture
 
-The architecture is broken down into several logical layers, each with specific responsibilities.
+The architecture is fully serverless and designed for scalability and decoupling of services.
 
-### 1. Ingestion Layer
+1.  **File Upload**: A user or system uploads a media file to a designated GCS input bucket.
+2.  **Initial Event**: An event notification (e.g., from a manual script or GCS trigger) is sent to a central Pub/Sub topic (`central-ingestion-topic`).
+3.  **Dispatcher Service (`batch-processor-dispatcher`)**:
+    -   A Cloud Run service subscribes to the central topic.
+    -   It creates a new asset record in the Firestore `media_assets` collection.
+    -   Based on the file type (video, audio, etc.), it dispatches tasks by publishing messages to specific Pub/Sub topics (`summaries-generation-topic`, `transcription-generation-topic`, etc.).
+4.  **Metadata Generator Services**:
+    -   Dedicated Cloud Run services (`summaries-generator`, `transcription-generator`, `previews-generator`) subscribe to their respective task topics.
+    -   Each service processes the file and generates the required metadata.
+    -   **`transcription-generator`**: Downloads the video, extracts audio with `ffmpeg`, uploads the audio back to GCS, and calls the Speech-to-Text API.
+    -   **`summaries-generator` / `previews-generator`**: Pass the GCS URI of the media file directly to the Gemini API for analysis.
+5.  **Firestore Update**: Each generator service updates the corresponding asset's document in Firestore with the results (`completed` status) or an error (`failed` status).
 
-* **Cloud Pub/Sub (Ingestion Topic):** The primary intake point. New media file information (audio, video, etc.) is submitted to this topic, acting as the event source for the entire pipeline.
-* **Cloud Pub/Sub Submission:** Submission to the ingestion topic initiates the pipeline.
-* **Cloud Pub/Sub (Ingestion Topic):** Decouples the file upload event from the processing logic. This provides resilience by queuing events, allowing for retries and preventing data loss if downstream services are temporarily unavailable.
+<p align="center">
+  <img src="docs/images/architecture.png" alt="Architecture Diagram" width="800">
+</p>
 
-### 2. Orchestration Layer
+---
 
-* **Cloud Run Service (Orchestrator/Dispatcher):** This service is the brain of the pipeline's initial phase. It subscribes to the Ingestion Topic. Upon receiving a message, it:
-    1.  Creates an initial document in Firestore for the new asset, noting its file path and setting a `processing` status.
-    2.  Publishes separate messages to dedicated task-specific topics for each type of metadata to be generated (e.g., summary, transcription, preview clips).
-* **Cloud Pub/Sub (Task-Specific Topics):** Enables parallel and independent processing of different metadata types. Separate topics exist for each task (e.g., `summaries-generation-topic`, `transcription-generation-topic`).
+## Prerequisites
 
-### 3. Metadata Generation Layer
+1.  **Google Cloud Project**: A Google Cloud project with billing enabled.
+2.  **gcloud CLI**: The Google Cloud CLI installed and authenticated.
+3.  **Terraform**: Terraform installed (v1.0.0+).
+4.  **Python**: Python 3.8+ installed.
 
-This layer consists of multiple independent Cloud Run services that perform the actual metadata extraction using Gemini models.
+---
 
-* **Summaries-Generator-Service:** Subscribes to the summaries topic. It calls the Gemini API with multiple prompts to generate a comprehensive analysis, including a main summary, itemized points, subject topics, and key sections/clips with timestamps. It then combines these results and updates the asset's document in Firestore.
-* **Transcription-Generator-Service:** Subscribes to the transcription topic, calls the Gemini API for audio transcription, and updates the Firestore document.
-* **Previews-Generator-Service:** Subscribes to the previews topic, calls the Gemini API to identify suitable segments for previews or short clips, and updates the Firestore document.
+## Deployment
 
-### 4. Storage Layer
+### 1. Configure Terraform
 
-* **Firestore (NoSQL Document Database):** The central, scalable repository for all generated metadata. Its flexible, document-based schema is ideal for storing semi-structured metadata and allows for independent, atomic updates to different parts of an asset's record.
+First, copy the example variables file and customize it for your environment.
 
-#### Example Firestore Document Structure
-
-The data for each media asset is stored in the `media_assets` collection.
-
-```
-/artifacts/{appId}/public/data/media_assets/{asset_id}
-{
-  "file_path": "gs://your-bucket/path/to/file.mp4",
-  "upload_time": "2025-08-05T10:00:00Z",
-  "overall_status": "processing",
-  "summary": {
-    "status": "completed",
-    "summary": "A medium length summary of the video content...",
-    "itemized_summary": [
-      {"item": "First key point from the video."},
-      {"item": "Second key point from the video."}
-    ],
-    "subject_topics": [
-      {"topic": "Media Analysis"},
-      {"topic": "Generative AI"}
-    ],
-    "sections": [
-      {
-        "type": "highlight",
-        "start_time": "00:32",
-        "end_time": "01:15",
-        "reason": "This section contains the main argument."
-      }
-    ],
-    "error_message": null,
-    "last_updated": "2025-08-05T10:05:00Z"
-  },
-  "transcription": {
-    "text": "...",
-    "language": "en",
-    "status": "pending",
-    "last_updated": null
-  },
-  "previews": {
-    "clips": [{"start_time": 10, "end_time": 20}],
-    "status": "failed",
-    "error": "Model failed to identify clips.",
-    "last_updated": "2025-08-05T10:10:00Z"
-  }
-}
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-### 5. API & Consumption Layer
+Now, edit `terraform/terraform.tfvars` and set the following variables:
 
-* **Cloud Run Service (Metadata API Gateway):** Provides a clean, RESTful interface (e.g., `/api/v1/assets/{asset_id}/metadata`) for applications to consume the generated metadata from Firestore.
-* **Frontend Application:** The user-facing application that calls the API Gateway to retrieve and display metadata. It is designed to gracefully handle partial or missing data by checking the `status` fields within the Firestore document.
+-   `project_id`: Your Google Cloud project ID.
+-   `input_bucket_names`: A list of GCS bucket names that will trigger the pipeline.
+-   `batch_processor_image`: The full Artifact Registry path for your dispatcher image.
+-   `summaries_generator_image`: The full Artifact Registry path for your summaries image.
+-   `transcription_generator_image`: The full Artifact Registry path for your transcription image.
+-   `previews_generator_image`: The full Artifact Registry path for your previews image.
 
-## Key Implementation Considerations
+**Example `terraform.tfvars`:**
+```hcl
+project_id = "your-gcp-project-id"
 
-* **Error Handling & Retries:** Implement robust error handling with retry mechanisms at each step, such as Pub/Sub message re-delivery and exponential backoff for API calls.
-* **Security:** Use IAM roles and service accounts to grant least-privilege access between services.
-* **Cost Monitoring:** Monitor costs associated with Gemini API usage and Cloud Run instances.
-* **Observability:** Use Cloud Logging, Monitoring, and Trace to track pipeline performance and troubleshoot issues.
-* **Version Control:** Manage all service code in a Git repository and use a CI/CD pipeline (e.g., Cloud Build) for automated deployments.
-<!-- Push your Docker images to Artifact registry
-cd services
-sh artifact_publish.sh
+input_bucket_names = [
+  "your-gcp-project-id-input"
+]
 
+# Define your Docker image URLs explicitly here
+batch_processor_image      = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/batch_processor_dispatcher:latest"
+summaries_generator_image  = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/summaries_generator:latest"
+transcription_generator_image = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/transcription_generator:latest"
+previews_generator_image   = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/previews_generator:latest"
+```
+
+### 2. Build and Push Docker Images
+
+This project is configured to use Google Cloud Build to build and push the service images directly to Artifact Registry. This removes the need for Docker to be installed on your local machine.
+
+The build process is triggered by submitting the service's source code to Cloud Build. Repeat the following command for each service in the `/services` directory (`batch_processor_dispatcher`, `summaries_generator`, etc.).
+
+```bash
+# Example for the dispatcher service
+export PROJECT_ID="your-gcp-project-id"
+export REPO="media-pipeline-images"
+export REGION="us-central1"
+export IMAGE_NAME="batch_processor_dispatcher"
+
+gcloud builds submit ./services/${IMAGE_NAME}/ \
+  --project=${PROJECT_ID} \
+  --tag="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE_NAME}:latest"
+```
+
+### 3. Apply Terraform
+
+Once your `.tfvars` file is configured and the Docker images have been pushed, you can deploy the infrastructure.
+
+```bash
 cd terraform
+
+# Initialize Terraform
 terraform init
-terraform plan -->
+
+# Plan the deployment
+terraform plan
+
+# Apply the changes
+terraform apply
+```
+
+This will provision all the necessary resources: GCS buckets, Pub/Sub topics, Cloud Run services, Firestore database, and all required IAM permissions.
+
+---
+
+## How to Use
+
+1.  **Upload a File**: Upload a video, audio, or document file to one of the GCS input buckets you defined in `input_bucket_names`.
+
+    ```bash
+    gsutil cp my-video.mp4 gs://your-gcp-project-id-input/
+    ```
+
+2.  **Trigger the Pipeline**: Publish a message to the `central-ingestion-topic` with the details of the uploaded file.
+
+    **Message Payload:**
+    ```json
+    {
+      "asset_id": "unique-asset-id-123",
+      "file_name": "my-video.mp4",
+      "file_location": "gs://your-gcp-project-id-input/my-video.mp4",
+      "content_type": "video/mp4",
+      "file_category": "video",
+      "public_url": "https://optional-public-url/my-video.mp4"
+    }
+    ```
+
+    **Publish with `gcloud`:**
+    ```bash
+    gcloud pubsub topics publish central-ingestion-topic --message='{"asset_id": "unique-asset-id-123", "file_name": "my-video.mp4", "file_location": "gs://your-gcp-project-id-input/my-video.mp4", "content_type": "video/mp4", "file_category": "video"}'
+    ```
+
+3.  **Monitor in Firestore**: You can now go to the Firestore console and view the `media_assets` collection. You will see a document with the ID `unique-asset-id-123`, and its `summary`, `transcription`, and `previews` fields will be updated in real-time as the services complete their tasks.
+
+---
