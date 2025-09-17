@@ -1,115 +1,112 @@
-# main.py
 import os
 import tempfile
-import functions_framework
-
-from google.cloud import firestore
+import moviepy as mp
 from google.cloud import storage
-from moviepy import VideoFileClip
+from google.cloud import firestore
 
-# Initialize clients globally.
-# In a Cloud Functions environment, this is a best practice as it allows
-# for connection reuse across function invocations.
+from firestore_utils import get_video_metadata
+from final_highlight_gen_tg import analyze_video_overview, initialize_vertex_client,create_highlight_reel
+# Set up clients for GCS and Firestore.
+# The clients will use your environment's authentication credentials.
+# For local development, ensure you are authenticated (e.g., `gcloud auth application-default login`).
 storage_client = storage.Client()
-db = firestore.Client()
-@functions_framework.cloud_event
-def fetch_video_and_store_metadata(cloud_event):
+firestore_client = firestore.Client()
+model_id="gemini-2.5-pro"
+
+
+def process_gcs_video_metadata(bucket_name, source_blob_name):
     """
-    Cloud Function triggered by a new object in a GCS bucket.
-    Fetches an MP4 video, extracts its duration, and stores the
-    metadata in a Firestore collection named 'video_metadata'.
+    Downloads a video from a GCS bucket, extracts its duration,
+    and stores the metadata in a Firestore document.
 
     Args:
-        event (dict): The GCS event dictionary containing 'bucket' and 'name'.
-        context (google.cloud.functions.Context): Metadata for the event.
+        bucket_name (str): The name of the GCS bucket.
+        source_blob_name (str): The full path to the video object in the bucket.
     """
-    data = cloud_event.data
-    file_name = data.get('name')
-    bucket_name = data.get('bucket')
-    #bucket_name = cloud_event['bucket']
+    
+    # 1. Download the video to a temporary local file.
+    # We use a temporary file to avoid cluttering the system and
+    # ensure it's deleted automatically.
+    
+    # Create a temporary file with a .mp4 extension for moviepy to recognize it.
+    temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+    temp_file_path = temp_file.name
+    temp_file.close()
 
-    # We only want to process mp4 files.
-    if not file_name.lower().endswith('.mp4'):
-        print(f"File {file_name} is not an MP4 file. Skipping.")
-        return
+    try:
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(source_blob_name)
+        #local_path = os.path.join(temp_dir, os.path.basename(blob_name))
+        
+        print(f"Downloading {source_blob_name} from bucket {bucket_name} to {temp_file_path}...")
+        blob.download_to_filename(temp_file_path)
+        print("Download complete.")
 
-    print(f"Processing file: {file_name} from bucket: {bucket_name}.")
-
-    # Create a temporary directory to download the video to.
-    # Using a 'with' statement ensures the directory and its contents are
-    # automatically cleaned up after the block is executed.
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Create a path for the temporary file.
-        temp_video_path = os.path.join(temp_dir, os.path.basename(file_name))
-
+        # 2. Use moviepy to get the video metadata.
+        # This is a much more efficient and reliable method for technical metadata
+        # like duration, as opposed to a large language model.
         try:
-            # 1. Download the video from GCS to the temporary path.
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(file_name)
+            video_clip = mp.VideoFileClip(temp_file_path)
+            duration_seconds = video_clip.duration
+            print(f"Video duration: {duration_seconds} seconds")
             
-            print(f"Downloading gs://{bucket_name}/{file_name} to {temp_video_path}...")
-            blob.download_to_filename(temp_video_path)
-            print("Download complete.")
-
-            # 2. Extract metadata (duration) using moviepy.
-            print("Extracting video duration...")
-            with VideoFileClip(temp_video_path) as video_clip:
-                duration_seconds = video_clip.duration
-            print(f"Video duration: {duration_seconds:.2f} seconds.")
-
-            # 3. Store metadata in Firestore.
-            # We'll use the video's filename (without extension) as the document ID
-            # to ensure uniqueness and easy lookups.
-            doc_id = os.path.splitext(os.path.basename(file_name))[0]
-            collection_name = "video_metadata"
-            
-            doc_ref = db.collection(collection_name).document(doc_id)
-
-            metadata = {
-                'gcs_bucket': bucket_name,
-                'gcs_path': file_name,
-                'gcs_uri': f"gs://{bucket_name}/{file_name}",
-                'duration_seconds': duration_seconds,
-                'processed_at': firestore.SERVER_TIMESTAMP, # Use server timestamp.
-            }
-
-            print(f"Storing metadata in Firestore collection '{collection_name}' with document ID '{doc_id}'...")
-            doc_ref.set(metadata)
-            print("Successfully stored metadata in Firestore.")
+            # Close the video clip to release the file handle
+            video_clip.close()
 
         except Exception as e:
-            print(f"An error occurred: {e}")
-            # Re-raising the exception will cause the function to fail, which
-            # can be useful for monitoring and retries.
-            raise
+            print(f"Error processing video with moviepy: {e}")
+            return
 
-# --- Main block for local testing ---
-if __name__ == "__main__":
-    # To test this script locally:
-    # 1. Make sure you have a video file in your GCS bucket.
-    # 2. Set the TEST_BUCKET_NAME and TEST_FILE_NAME variables below.
-    # 3. Authenticate with Google Cloud: `gcloud auth application-default login`
-    # 4. Install dependencies: `pip install -r requirements.txt`
-    # 5. Run the script: `python main.py`
-
-    # --- Configuration for local testing ---
-    TEST_BUCKET_NAME = "your-gcs-bucket-name"  # <--- CHANGE THIS
-    TEST_FILE_NAME = "videos/sample-video.mp4" # <--- CHANGE THIS (e.g., path/to/your/video.mp4)
-    # -----------------------------------------
-
-    if TEST_BUCKET_NAME == "your-gcs-bucket-name" or not TEST_FILE_NAME:
-        print("="*60)
-        print("!!! PLEASE UPDATE `TEST_BUCKET_NAME` and `TEST_FILE_NAME` !!!")
-        print("="*60)
-    else:
-        # Create a mock event dictionary to simulate a GCS trigger.
-        mock_event = {
-            'bucket': TEST_BUCKET_NAME,
-            'name': TEST_FILE_NAME
+        # 3. Store the metadata in a Firestore document.
+        # The document will be created in the 'video_metadata' collection.
+        metadata = {
+            'video_path': f"gs://{bucket_name}/{source_blob_name}",
+            'duration_seconds': duration_seconds,
+            'timestamp': firestore.SERVER_TIMESTAMP
         }
-        # The context argument is not used in this function, so it can be None.
-        mock_context = None
 
-        print("--- Running local test ---")
-        fetch_video_and_store_metadata(mock_event)
-        print("--- Local test finished ---")
+        doc_ref = firestore_client.collection('video_metadata').add(metadata)
+        print(f"Metadata for {source_blob_name} stored in Firestore with ID: {doc_ref[1].id}")
+        return doc_ref[1].id
+
+    finally:
+        # Clean up the temporary file, regardless of success or failure.
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+            print(f"Cleaned up temporary file: {temp_file_path}")
+
+
+# --- Example Usage ---
+# To run this script, you will need to:
+# 1. Have a GCP project with a GCS bucket and Firestore database.
+# 2. Have a video file uploaded to your GCS bucket.
+# 3. Install the required libraries:
+#    pip install google-cloud-storage google-cloud-firestore moviepy
+# 4. Authenticate your environment (e.g., using `gcloud auth application-default login`).
+# 5. Uncomment the lines below and replace with your specific bucket and video file path.
+
+if __name__ == "__main__":
+     your_bucket_name = "fox-metadata-input"  # Replace with your GCS bucket name
+     your_video_path = "ncis_los_angeles.mp4"
+     collection_name = "video_metadata"
+     
+     doc_id=process_gcs_video_metadata(your_bucket_name, your_video_path)
+     #print(f"Stored metadata in Firestore document ID: {doc_id}")
+     Document_data=get_video_metadata(firestore_client, collection_name, doc_id)
+     print(f"Fetched metadata from Firestore document ID: {doc_id}")
+     print(f"Document data: {Document_data}")
+     video_url=Document_data['video_path']
+     duration=Document_data['duration_seconds']
+     print(f"Video URL: {video_url}")
+     print(f"Creating Highlight Reel...")
+     create_highlight_reel(video_url,duration,model_id)
+
+
+
+
+     #print(f"Analyzing Video Overview...")
+     #analyze_video_overview(video_url,duration,model_id)
+
+
+
+
