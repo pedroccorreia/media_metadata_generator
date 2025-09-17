@@ -1,14 +1,15 @@
-
-from google.cloud import firestore
+""" Service for handling document storage """
 import logging
 from typing import Optional
+
+from google.cloud import firestore
 
 # Get a logger instance for this module.
 # It will inherit the configuration from the root logger in the service entry point.
 logger = logging.getLogger(__name__)
 # Assume __app_id is globally available in the Cloud Run environment
 # For local testing, you might need to set it:
-# __app_id = "your-default-app-id" 
+# __app_id = "your-default-app-id"
 class MediaAssetManager:
     """
     Manages media asset metadata in Firestore, supporting read, insert, and update operations.
@@ -60,7 +61,8 @@ class MediaAssetManager:
             content_type (str): MIME type of the media file (e.g., "video/mp4").
             file_category (str): The category of the file (e.g., "video", "audio", "document").
             file_name (str): The original name of the file.
-            public_url (Optional[str], optional): Publicly accessible URL for the media file. Defaults to None.
+            public_url (Optional[str], optional): Publicly accessible URL for 
+            the media file. Defaults to None.
             poster_url (str, optional): URL for a poster image. Defaults to a placeholder.
             is_dummy (bool, optional): Flag if this is dummy content. Defaults to False.
 
@@ -115,10 +117,12 @@ class MediaAssetManager:
 
         try:
             doc_ref.set(initial_data, merge=False) # Use merge=False for initial creation
-            logger.info("Successfully inserted asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
+            logger.info("Successfully inserted asset: %s",
+                        asset_id, extra={"extra_fields": {"asset_id": asset_id}})
             return True
-        except Exception as e:
-            logger.error("Error inserting asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+        except Exception:
+            logger.error("Error inserting asset %s",
+                        asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return False
 
     def get_asset(self, asset_id: str) -> Optional[dict]:
@@ -136,13 +140,16 @@ class MediaAssetManager:
             doc = doc_ref.get()
             if doc.exists:
                 data = doc.to_dict()
-                logger.debug("Retrieved asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
+                logger.debug("Retrieved asset: %s",
+                            asset_id, extra={"extra_fields": {"asset_id": asset_id}})
                 return data
             else:
-                logger.warning("Asset %s not found.", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
+                logger.warning("Asset %s not found.",
+                                asset_id, extra={"extra_fields": {"asset_id": asset_id}})
                 return None
-        except Exception as e:
-            logger.error("Error retrieving asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+        except Exception:
+            logger.error("Error retrieving asset %s",
+                        asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return None
 
     def update_asset_metadata(
@@ -170,23 +177,37 @@ class MediaAssetManager:
         update_payload = {}
         current_time = firestore.SERVER_TIMESTAMP
 
-        if metadata_type in ["summary", "transcription", "previews", "video_details", "image_details", "article_details"]:
-            # For nested objects, merge the incoming data into the existing object
+        # Check if the update is for a nested dictionary (e.g., "summary", "transcription").
+        # These are predefined, structured objects within the Firestore document.
+        if metadata_type in ["summary", "transcription", "previews", "video_details",
+                        "image_details", "article_details"]:
+            # For nested objects, construct the update payload using dot notation.
+            # This allows Firestore to update individual fields within the nested object
+            # without overwriting the entire object.
             for key, value in data.items():
                 update_payload[f"{metadata_type}.{key}"] = value
             update_payload[f"{metadata_type}.last_updated"] = current_time
         else:
-            # For top-level fields like "poster_url" or "is_dummy"
+            # If it's not a known nested object, treat it as a top-level field.
+            # The 'data' argument is expected to be the direct value for the field.
             update_payload[metadata_type] = data
-            
+
         update_payload["last_updated"] = current_time # Always update top-level timestamp
 
         try:
             doc_ref.update(update_payload)
-            logger.info("Successfully updated '%s' for asset: %s", metadata_type, asset_id, extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
+            logger.info("Successfully updated '%s' for asset: %s",
+                        metadata_type, asset_id,
+                        extra={"extra_fields":
+                        {"asset_id": asset_id, "metadata_type": metadata_type}})
             return True
-        except Exception as e:
-            logger.error("Error updating '%s' for asset %s", metadata_type, asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id, "metadata_type": metadata_type}})
+        except Exception:
+            logger.error("Error updating '%s' for asset %s",
+                        metadata_type,
+                        asset_id,
+                        exc_info=True,
+                        extra={"extra_fields":
+                        {"asset_id": asset_id, "metadata_type": metadata_type}})
             return False
 
     def delete_asset(self, asset_id: str) -> bool:
@@ -202,8 +223,11 @@ class MediaAssetManager:
         doc_ref = self._get_doc_ref(asset_id)
         try:
             doc_ref.delete()
-            logger.info("Successfully deleted asset: %s", asset_id, extra={"extra_fields": {"asset_id": asset_id}})
+            logger.info("Successfully deleted asset: %s",
+                        asset_id, extra={"extra_fields": {"asset_id": asset_id}})
             return True
-        except Exception as e:
-            logger.error("Error deleting asset %s", asset_id, exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+        except Exception :
+            logger.error("Error deleting asset %s",
+                        asset_id,
+                        exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
             return False

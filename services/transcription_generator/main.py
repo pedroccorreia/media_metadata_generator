@@ -1,15 +1,17 @@
-""" Worker node for transcription of the entire video. """
+"""Worker node for transcription of the entire video."""
 
 import os
 import json
 import base64
 import logging
 from flask import Flask, request
+
 # Speech-to-Text imports
 from google.api_core.client_options import ClientOptions
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech
 from google.api_core.exceptions import NotFound
+
 # Additional imports for GCS and ffmpeg
 from google.cloud import storage
 import ffmpeg
@@ -45,8 +47,11 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
               or an error dictionary if generation fails.
     """
     log_extra = {"extra_fields": {"asset_id": asset_id, "file_location": video_gcs_uri}}
-    logger.info("Starting transcription generation for asset: %s", asset_id, extra=log_extra)
+    logger.info(
+        "Starting transcription generation for asset: %s", asset_id, extra=log_extra
+    )
 
+    # Initialize local file paths to ensure they are available for the finally block.
     local_video_path = ""
     local_audio_path = ""
 
@@ -58,12 +63,14 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
         bucket_name, blob_name = video_gcs_uri.replace("gs://", "").split("/", 1)
         video_filename = os.path.basename(blob_name)
 
+        # Define local temporary paths for downloading the video and storing the extracted audio.
         local_video_path = f"/tmp/{asset_id}_{video_filename}"
         local_audio_path = f"/tmp/{asset_id}.flac"
 
+        # Define GCS paths for the extracted audio and the transcription results.
         audio_gcs_path = f"{asset_id}/audio.flac"
         audio_gcs_uri = f"gs://{bucket_name}/{audio_gcs_path}"
-        results_gcs_path = f"gs://{bucket_name}"
+        results_gcs_path = f"gs://{bucket_name}/{asset_id}/transcription_results/"
 
         # 2. Download video from GCS
         logger.info("Downloading video file: %s", video_gcs_uri, extra=log_extra)
@@ -71,15 +78,18 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
         video_blob = bucket.blob(blob_name)
         video_blob.download_to_filename(local_video_path)
 
-        # 3. Extract audio using ffmpeg
+        # 3. Extract audio using ffmpeg.
+        # The audio is converted to FLAC format with a 16000Hz sample rate,
+        # as recommended for Speech-to-Text.
         logger.info("Extracting audio from %s", local_video_path, extra=log_extra)
         try:
             ffmpeg.input(local_video_path).output(
-                local_audio_path, acodec='flac', ar='16000', vn=None
+                local_audio_path, acodec="flac", ar="16000", vn=None
             ).run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
         except ffmpeg.Error as e:
             stderr = e.stderr.decode() if e.stderr else "No stderr"
-            raise RuntimeError(f"ffmpeg failed: {stderr}")
+            logger.error("ffmpeg failed: %s", stderr, exc_info=True, extra=log_extra)
+            raise e
 
         # 4. Upload extracted audio to GCS
         logger.info("Uploading extracted audio to %s", audio_gcs_uri, extra=log_extra)
@@ -87,25 +97,41 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
         audio_blob.upload_from_filename(local_audio_path)
 
         # 5. Transcribe using Speech-to-Text API
+        # Initialize the SpeechClient with the regional endpoint for better performance.
         speech_client = SpeechClient(
-            client_options=ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
+            client_options=ClientOptions(
+                api_endpoint=f"{location}-speech.googleapis.com"
+            )
         )
 
         language_code = "en-US"  # This could be made configurable
         recognizer_id = f"chirp-long-form-{language_code.lower()}"
-        recognizer_name = f"projects/{project_id}/locations/{location}/recognizers/{recognizer_id}"
+        recognizer_name = (
+            f"projects/{project_id}/locations/{location}/recognizers/{recognizer_id}"
+        )
 
+        # Check if the required recognizer exists. If not, create it.
+        # This makes the service self-sufficient and avoids manual setup.
         try:
             recognizer = speech_client.get_recognizer(name=recognizer_name)
         except NotFound:
-            logger.info("Recognizer '%s' not found, creating it.", recognizer_id, extra=log_extra)
+            logger.info(
+                "Recognizer '%s' not found, creating it.",
+                recognizer_id,
+                extra=log_extra,
+            )
             recognizer_request = cloud_speech.CreateRecognizerRequest(
                 parent=f"projects/{project_id}/locations/{location}",
                 recognizer_id=recognizer_id,
-                recognizer=cloud_speech.Recognizer(language_codes=[language_code], model="chirp"),
+                recognizer=cloud_speech.Recognizer(
+                    language_codes=[language_code], model="chirp"
+                ),
             )
-            recognizer = speech_client.create_recognizer(request=recognizer_request).result()
+            recognizer = speech_client.create_recognizer(
+                request=recognizer_request
+            ).result()
 
+        # Configure the recognition job with features like punctuation and word timings.
         config = cloud_speech.RecognitionConfig(
             features=cloud_speech.RecognitionFeatures(
                 enable_automatic_punctuation=True, enable_word_time_offsets=True
@@ -113,6 +139,7 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
             auto_decoding_config={},
         )
 
+        # Set up the batch recognition request, pointing to the audio file in GCS.
         batch_recognize_request = cloud_speech.BatchRecognizeRequest(
             recognizer=recognizer.name,
             recognition_output_config={"gcs_output_config": {"uri": results_gcs_path}},
@@ -120,98 +147,166 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
         )
 
         operation = speech_client.batch_recognize(request=batch_recognize_request)
-        logger.info("Waiting for transcription operation to complete...", extra=log_extra)
+        logger.info(
+            "Waiting for transcription operation to complete...", extra=log_extra
+        )
         response = operation.result()
 
-        # 6. Process results from GCS
+        # 6. Process results from GCS.
+        # The Speech-to-Text API writes the output to a new file in the specified GCS location.
         result_uri = response.results[audio_gcs_uri].uri
-        result_bucket_name, result_blob_name = result_uri.replace("gs://", "").split("/", 1)
+        result_bucket_name, result_blob_name = result_uri.replace("gs://", "").split(
+            "/", 1
+        )
 
         result_blob = storage_client.bucket(result_bucket_name).blob(result_blob_name)
         transcript_data = json.loads(result_blob.download_as_text())
 
-        # 7. Format the output
+        # 7. Format the output into a structured dictionary.
         full_transcript = ""
         words = []
         for result in transcript_data.get("results", []):
             alternative = result.get("alternatives", [{}])[0]
             full_transcript += alternative.get("transcript", "") + " "
             for word_info in alternative.get("words", []):
-                words.append({
-                    "word": word_info.get("word"),
-                    "start_time": word_info.get("startOffset"),
-                    "end_time": word_info.get("endOffset"),
-                })
+                words.append(
+                    {
+                        "word": word_info.get("word"),
+                        "start_time": word_info.get("startOffset"),
+                        "end_time": word_info.get("endOffset"),
+                    }
+                )
 
         final_result = {
             "text": full_transcript.strip(),
             "words": words,
-            "gcs_uri": result_uri
+            "gcs_uri": result_uri,
         }
-        logger.info("Successfully generated transcription for asset %s", asset_id, extra=log_extra)
+        logger.info(
+            "Successfully generated transcription for asset %s",
+            asset_id,
+            extra=log_extra,
+        )
         return final_result
 
     except Exception as e:
-        logger.error("Failed to generate transcription for asset %s", asset_id, exc_info=True, extra=log_extra)
+        # General exception handler to catch any errors during the process.
+        logger.error(
+            "Failed to generate transcription for asset %s",
+            asset_id,
+            exc_info=True,
+            extra=log_extra,
+        )
         return {"error": f"Failed to process transcription: {str(e)}"}
     finally:
-        # 8. Cleanup local files
+        # 8. Cleanup local files to free up disk space on the Cloud Run instance.
         for path in [local_video_path, local_audio_path]:
             if os.path.exists(path):
                 try:
                     os.remove(path)
                 except OSError as e:
-                    logger.warning("Error cleaning up file %s: %s", path, e, extra=log_extra)
+                    logger.warning(
+                        "Error cleaning up file %s: %s", path, e, extra=log_extra
+                    )
+
 
 @app.route("/", methods=["POST"])
 def handle_message():
     """
     Cloud Run entry point that processes Pub/Sub messages to generate transcriptions.
     """
+    # Safely get the JSON payload from the request.
     request_json = request.get_json(silent=True)
-    if not request_json or 'message' not in request_json:
+    if not request_json or "message" not in request_json:
         logger.error("Invalid Pub/Sub message format: missing 'message' key.")
-        return 'Bad Request: invalid Pub/Sub message format', 400
+        return "Bad Request: invalid Pub/Sub message format", 400
 
-    pubsub_message = request_json['message']
+    pubsub_message = request_json["message"]
+    # Initialize asset_id to ensure it's available for logging in case of parsing errors.
     asset_id = None  # Initialize asset_id for error logging
 
     try:
-        message_data = json.loads(base64.b64decode(pubsub_message['data']).decode('utf-8'))
+        message_data = json.loads(
+            base64.b64decode(pubsub_message["data"]).decode("utf-8")
+        )
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
 
+        # Validate that all required fields are present in the message.
         if not all([asset_id, file_location, file_name]):
-            logger.error("Message missing required data: asset_id, file_location or file_name.", extra={"extra_fields": {"message_data": message_data}})
+            logger.error(
+                "Message missing required data: asset_id, file_location or file_name.",
+                extra={"extra_fields": {"message_data": message_data}},
+            )
             return "Bad Request: missing required data", 400
 
-        log_extra = {"extra_fields": {"asset_id": asset_id, "file_name": file_name, "file_location": file_location}}
-        logger.info("Processing transcription generation request for asset: %s", asset_id, extra=log_extra)
+        log_extra = {
+            "extra_fields": {
+                "asset_id": asset_id,
+                "file_name": file_name,
+                "file_location": file_location,
+            }
+        }
+        logger.info(
+            "Processing transcription generation request for asset: %s",
+            asset_id,
+            extra=log_extra,
+        )
 
-        asset_manager.update_asset_metadata(asset_id, "transcription", {"status": "processing"})
+        # Update the asset's status to 'processing' in Firestore.
+        asset_manager.update_asset_metadata(
+            asset_id, "transcription", {"status": "processing"}
+        )
 
+        # Trigger the core logic to generate the transcription.
         transcription_results = generate_transcription(asset_id, file_location)
 
+        # Handle the result: update Firestore with success or failure status.
         if "error" in transcription_results:
             error_msg = transcription_results["error"]
             update_data = {"status": "failed", "error_message": error_msg}
             asset_manager.update_asset_metadata(asset_id, "transcription", update_data)
-            logger.error("Transcription generation failed for asset %s: %s", asset_id, error_msg, extra=log_extra)
+            logger.error(
+                "Transcription generation failed for asset %s: %s",
+                asset_id,
+                error_msg,
+                extra=log_extra,
+            )
         else:
             update_data = {
-                "status": "completed", 
-                "text": transcription_results.get("text"), 
-                "words": transcription_results.get("words", []), 
+                "status": "completed",
+                "text": transcription_results.get("text"),
+                "words": transcription_results.get("words", []),
                 "gcs_uri": transcription_results.get("gcs_uri"),
-                "error_message": None
+                "error_message": None,
             }
             asset_manager.update_asset_metadata(asset_id, "transcription", update_data)
-            logger.info("Successfully completed transcription generation for asset: %s", asset_id, extra=log_extra)
+            logger.info(
+                "Successfully completed transcription generation for asset: %s",
+                asset_id,
+                extra=log_extra,
+            )
 
-        return '', 204
+        return "", 204
     except Exception as e:
-        logger.critical("Unhandled exception during transcription generation.", exc_info=True, extra={"extra_fields": {"asset_id": asset_id}})
+        # This is a critical failure block for any unhandled exceptions in the process.
+        # It logs the error and updates Firestore to prevent the asset from
+        # being stuck in 'processing'.
+        logger.critical(
+            "Unhandled exception during transcription generation.",
+            exc_info=True,
+            extra={"extra_fields": {"asset_id": asset_id}},
+        )
         if asset_id:
-            asset_manager.update_asset_metadata(asset_id, "transcription", {"status": "failed", "error_message": f"Critical error in service: {str(e)}"})
+            asset_manager.update_asset_metadata(
+                asset_id,
+                "transcription",
+                {
+                    "status": "failed",
+                    "error_message": f"Critical error in service: {str(e)}",
+                },
+            )
+        # Return a 204 status to acknowledge the Pub/Sub message and prevent retries,
+        # even though an error occurred. This is a common pattern for non-recoverable errors.
         return "Error processing message, but acknowledging to prevent retries.", 204
