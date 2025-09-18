@@ -5,7 +5,7 @@ from google.cloud import storage
 from google.cloud import firestore
 
 from firestore_utils import get_video_metadata
-from final_highlight_gen_tg import analyze_video_overview, initialize_vertex_client,create_highlight_reel
+from final_highlight_gen import analyze_video_overview, initialize_vertex_client,create_highlight_reel
 # Set up clients for GCS and Firestore.
 # The clients will use your environment's authentication credentials.
 # For local development, ensure you are authenticated (e.g., `gcloud auth application-default login`).
