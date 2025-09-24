@@ -50,7 +50,7 @@ def update_all_signed_urls_in_bucket():
         for blob in all_blobs:
             object_name = blob.name
             try:
-                # Use the in-memory map for a fast lookup
+                # Using the in-memory map for a fast lookup
                 if object_name not in docs_by_filename:
                     skipped_count += 1
                     continue

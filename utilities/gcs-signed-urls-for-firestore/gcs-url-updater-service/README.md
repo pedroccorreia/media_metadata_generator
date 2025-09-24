@@ -1,8 +1,8 @@
 GCS Signed URL Refresh Utility
 Overview
-This utility was created to demonstrate how archival media content can be surfaced securely for Agentspace agents and other users to reference, along with its corresponding metadata from Firestore.
+This utility was created to demonstrate how archival media and news content can be surfaced securely for Agentspace agents and other users to reference, along with its corresponding metadata from Firestore. The no-code agents from agentspace would use the metadata to answer questions from archival data as its more cost effective but these signed urls would provide a link to users to reference the files. Anyone with access to the firestore metadata collection using the agent would have access to these signed_urls so its recommended to manage the user level access to firestore collection to ensure only authorised users can access the archival data. For production, more well defined security plan might need to be incorporated.
 
-It solves the problem of expiring Google Cloud Storage (GCS) signed URLs, which have a maximum lifespan of 7 days. This service provides a secure, on-demand, authenticated endpoint that, when triggered, will:
+This utility solves the problem of expiring Google Cloud Storage (GCS) signed URLs, which have a maximum lifespan of 7 days. This service provides a secure, on-demand, authenticated endpoint that, when triggered, will:
 
 Scan all objects in a specified GCS bucket.
 
