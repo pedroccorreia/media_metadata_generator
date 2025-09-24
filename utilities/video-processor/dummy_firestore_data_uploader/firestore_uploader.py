@@ -49,16 +49,16 @@ if __name__ == '__main__':
     # --- CONFIGURATION ---
     # 1. Replace with your actual GCP project ID
     #    You can also set this via the GOOGLE_CLOUD_PROJECT environment variable
-    GCP_PROJECT_ID = "Your Project HERE"
+    GCP_PROJECT_ID = "YOUR PROJECT ID HERE"
     
     # 2. The path to your new JSON file
-    JSON_FILE = "video_data_file.json"
+    JSON_FILE = "PATH TO YOUR DUMMY FILE HERE"
     
     # 3. The name you want for your Firestore collection
     COLLECTION_NAME = "highlights-demo-test" 
     
     # 4. The unique ID for this video document in Firestore
-    DOCUMENT_ID = "sbs-news-broadcast-01"
+    DOCUMENT_ID = "ENTER THE DOCUMENT ID HERE"
     
     # --- RUN THE UPLOAD ---
     upload_single_json_to_firestore(
