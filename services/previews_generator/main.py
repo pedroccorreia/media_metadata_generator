@@ -16,6 +16,17 @@ from common.logging_config import configure_logger
 from .structured_output_schema import SHORTS_SCHEMA
 
 
+# Highlight Generation service Imports
+import tempfile
+import moviepy as mp
+from google.cloud import storage
+from google.cloud import firestore
+
+from firestore_utils import get_video_metadata
+from final_highlight_gen import analyze_video_overview, initialize_vertex_client,create_highlight_reel
+
+
+
 # Configure logger for the service
 configure_logger()
 logger = logging.getLogger(__name__)
@@ -23,6 +34,9 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 asset_manager = MediaAssetManager(project_id=project_id)
+
+storage_client = storage.Client()
+firestore_client = firestore.Client()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -177,6 +191,68 @@ def generate_previews(asset_id: str, file_location: str) -> Union[list, dict]:
         )
         return {"error": f"Failed to generate previews: {str(e)}"}
 
+def create_video_metadata(bucket_name, source_blob_name,collection_name):
+    """
+    Downloads a video from a GCS bucket, extracts its duration,
+    ,stores the metadata in a Firestore document
+    and returns the document ID.
+
+    Args:
+        bucket_name (str): The name of the GCS bucket.
+        source_blob_name (str): The full path to the video object in the bucket.
+        collection_name (str): The Firestore collection name to store the metadata.
+    """
+    
+    # 1. Download the video to a temporary local file.
+    # We use a temporary file to avoid cluttering the system and
+    # ensure it's deleted automatically.
+    
+    # Create a temporary file with a .mp4 extension for moviepy to recognize it.
+    temp_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+    temp_file_path = temp_file.name
+    temp_file.close()
+
+    try:
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(source_blob_name)
+        #local_path = os.path.join(temp_dir, os.path.basename(blob_name))
+        
+        print(f"Downloading {source_blob_name} from bucket {bucket_name} to {temp_file_path}...")
+        blob.download_to_filename(temp_file_path)
+        print("Download complete.")
+
+        # 2. Use moviepy to get the video metadata.
+        # This is a much more efficient and reliable method for technical metadata
+        # like duration, as opposed to a large language model.
+        try:
+            video_clip = mp.VideoFileClip(temp_file_path)
+            duration_seconds = video_clip.duration
+            print(f"Video duration: {duration_seconds} seconds")
+            
+            # Close the video clip to release the file handle
+            video_clip.close()
+
+        except Exception as e:
+            print(f"Error processing video with moviepy: {e}")
+            return
+
+        # 3. Store the metadata in a Firestore document.
+        # The document will be created in the 'video_metadata' collection.
+        metadata = {
+            #'video_path': f"gs://{bucket_name}/{source_blob_name}",
+            'duration_seconds': duration_seconds,
+            'timestamp': firestore.SERVER_TIMESTAMP
+        }
+
+        doc_ref = firestore_client.collection('video_metadata').add(metadata)
+        print(f"Metadata for {source_blob_name} stored in Firestore with ID: {doc_ref[1].id}")
+        return doc_ref[1].id
+
+    finally:
+        # Clean up the temporary file, regardless of success or failure.
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+            print(f"Cleaned up temporary file: {temp_file_path}")
 
 @app.route("/", methods=["POST"])
 def handle_message():
@@ -199,7 +275,7 @@ def handle_message():
             base64.b64decode(pubsub_message["data"]).decode("utf-8")
         )
         asset_id = message_data.get("asset_id")
-        file_location = message_data.get("file_location")
+        file_location = message_data.get("file_path")
         file_name = message_data.get("file_name")
 
         # Validate that all required fields are present in the message.
@@ -229,6 +305,29 @@ def handle_message():
         )
         # Trigger the core logic to generate preview clips.
         preview_results = generate_previews(asset_id, file_location)
+
+        #### Trigger the core logic to generate highlights
+
+
+
+        video_file_name= file_name +".mp4"
+        bucket_name=file_location.split("/")[2] 
+        collection_name = message_data.get("collection_name")
+        #Creating the new Metadata entry in Firestore for highlights
+        doc_id=create_video_metadata(bucket_name, video_file_name,collection_name)
+
+        #Feching of created new Metadata entry from Firestore
+        Document_data=get_video_metadata(firestore_client, collection_name, doc_id)
+        print(f"Fetched metadata from Firestore document ID: {doc_id}")
+        print(f"Document data: {Document_data}")
+
+        duration=Document_data['duration_seconds']
+        model_id="gemini-2.5-pro"
+
+        print(f"Creating Highlight Reel... for {file_name}")
+        create_highlight_reel(file_location,duration,model_id)
+
+
 
         # A successful response is a list of clips, while an error is a dict.
         if isinstance(preview_results, dict) and "error" in preview_results:
