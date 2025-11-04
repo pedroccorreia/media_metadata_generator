@@ -7,9 +7,9 @@ import os
 import traceback
 import tempfile
 from moviepy import VideoFileClip
-from prompts import VIDEO_OVERVIEW_PROMPT, VIDEO_CHUNKING_PROMPT, REEL_ANALYSIS_PROMPT
-from video_creator import create_final_highlight_reel
-from utils import (
+from .prompts import VIDEO_OVERVIEW_PROMPT, VIDEO_CHUNKING_PROMPT, REEL_ANALYSIS_PROMPT
+from .video_creator import create_final_highlight_reel
+from .utils import (
     seconds_to_mmss, 
     smooth_segment_boundaries,    
     mmss_to_seconds, 
@@ -17,7 +17,7 @@ from utils import (
     initialize_vertex_client,
     validate_timestamp_markers, 
     detect_segment_overlap)
-from get_video_gcs import download_from_gcs
+from .get_video_gcs import download_from_gcs
 from google.cloud import storage
 
 

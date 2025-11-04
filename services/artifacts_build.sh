@@ -19,6 +19,12 @@ services=(
 for service_name in "${services[@]}"; do
     echo "--- Starting publish process for service: $service_name ---"
     
+    # If the service is 'previews_generator', copy the 'firestore_util.py' file to its directory.
+    if [ "$service_name" == "previews_generator" ]; then
+        echo "Copying firestore_util.py to previews_generator..."
+        cp ../utilities/video-processor/firestore_util.py "$service_name/"
+    fi
+
     # Execute the artifact_publish.sh script with the current service name as an argument.
     # The leading "./" ensures the script is run from the current directory.
     sh artifact.sh "$service_name"

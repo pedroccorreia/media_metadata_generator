@@ -92,6 +92,13 @@ resource "google_pubsub_topic" "previews_topic" {
   name    = "previews-generation-topic"
 }
 
+# Dead-Letter Topic
+# This topic receives messages that fail processing after multiple retries from any of the main subscriptions.
+resource "google_pubsub_topic" "dead_letter_topic" {
+  project = var.project_id
+  name    = "dead-letter-topic"
+}
+
 ################################################################################
 # Service Accounts (IAM)
 ################################################################################
@@ -193,7 +200,7 @@ resource "google_project_iam_member" "metadata_generator_speech_client" {
 resource "google_project_iam_member" "aiplatform_sa_gcs_reader" {
   project    = var.project_id
   role       = "roles/storage.objectViewer"
-  member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  member     = "serviceAccount:service-409545154269@gcp-sa-aiplatform.iam.gserviceaccount.com"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
 }
 
@@ -377,8 +384,8 @@ resource "google_cloud_run_service" "transcription_generator" {
         }
         resources {
           limits = {
-            cpu    = "2"
-            memory = "8Gi"
+            cpu    = "8"
+            memory = "32Gi"
           }
         }
       }
@@ -407,6 +414,12 @@ resource "google_cloud_run_service" "previews_generator" {
           name  = "GOOGLE_CLOUD_PROJECT"
           value = var.project_id
         }
+        resources {
+          limits = {
+            cpu    = "8"
+            memory = "32Gi"
+          }
+        }
       }
       container_concurrency = var.previews_generator_concurrency
       timeout_seconds = 600 # 10 minutes
@@ -432,6 +445,11 @@ resource "google_pubsub_subscription" "batch_processor_sub" {
   topic    = google_pubsub_topic.central_ingestion_topic.name
   ack_deadline_seconds = 600 # Up to 10 minutes
 
+  dead_letter_policy {
+    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    max_delivery_attempts = 5
+  }
+
   # Push configuration to Cloud Run service
   push_config {
     push_endpoint = google_cloud_run_service.batch_processor.status[0].url
@@ -451,6 +469,11 @@ resource "google_pubsub_subscription" "summaries_sub" {
   topic   = google_pubsub_topic.summaries_topic.name
   ack_deadline_seconds = 600 # Adjust based on expected processing time
 
+  dead_letter_policy {
+    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    max_delivery_attempts = 5
+  }
+
   push_config {
     push_endpoint = google_cloud_run_service.summaries_generator.status[0].url
     oidc_token {
@@ -465,6 +488,11 @@ resource "google_pubsub_subscription" "transcription_sub" {
   topic   = google_pubsub_topic.transcription_topic.name
   ack_deadline_seconds = 600 # Adjust for potentially long transcription times 
 
+  dead_letter_policy {
+    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    max_delivery_attempts = 5
+  }
+
   push_config {
     push_endpoint = google_cloud_run_service.transcription_generator.status[0].url
     oidc_token {
@@ -478,6 +506,11 @@ resource "google_pubsub_subscription" "previews_sub" {
   name    = "previews-generator-sub"
   topic   = google_pubsub_topic.previews_topic.name
   ack_deadline_seconds = 600
+
+  dead_letter_policy {
+    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    max_delivery_attempts = 5
+  }
 
   push_config {
     push_endpoint = google_cloud_run_service.previews_generator.status[0].url

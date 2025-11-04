@@ -22,8 +22,8 @@ import moviepy as mp
 from google.cloud import storage
 from google.cloud import firestore
 
-from firestore_utils import get_video_metadata
-from final_highlight_gen import analyze_video_overview, initialize_vertex_client,create_highlight_reel
+from .firestore_util import get_video_metadata
+from .final_highlight_gen import analyze_video_overview, initialize_vertex_client,create_highlight_reel
 
 
 
@@ -143,6 +143,8 @@ def generate_previews(asset_id: str, file_location: str) -> Union[list, dict]:
         extra={"extra_fields": {"asset_id": asset_id, "file_location": file_location}},
     )
 
+    
+
     try:
         # Define the system instructions and user prompt for the model.
         system_instructions_text = """
@@ -156,6 +158,8 @@ def generate_previews(asset_id: str, file_location: str) -> Union[list, dict]:
         model = "gemini-2.5-flash"
 
         # Call the generative model to get potential preview clips.
+        logger.info("Input parameters: asset_id=%s, file_location=%s prompt=%s model=%s", asset_id, file_location, prompt, model)
+
         raw_response = generate(
             prompt,
             file_location,
@@ -275,9 +279,19 @@ def handle_message():
             base64.b64decode(pubsub_message["data"]).decode("utf-8")
         )
         asset_id = message_data.get("asset_id")
-        file_location = message_data.get("file_path")
+        file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
 
+        
+        #log all input params
+        logger.info(
+            "Processing preview generation request for asset: %s | file_name: %s | file_location: %s message_data %s",
+            asset_id,
+            file_name,
+            file_location,
+            message_data
+        )
+        
         # Validate that all required fields are present in the message.
         if not all([asset_id, file_location, file_name]):
             logger.error(
@@ -307,25 +321,22 @@ def handle_message():
         preview_results = generate_previews(asset_id, file_location)
 
         #### Trigger the core logic to generate highlights
+        # video_file_name= file_name +".mp4"
+        # bucket_name=file_location.split("/")[2] 
+        # collection_name = message_data.get("collection_name")
+        # #Creating the new Metadata entry in Firestore for highlights
+        # doc_id=create_video_metadata(bucket_name, video_file_name,collection_name)
 
+        # #Feching of created new Metadata entry from Firestore
+        # Document_data=get_video_metadata(firestore_client, collection_name, doc_id)
+        # print(f"Fetched metadata from Firestore document ID: {doc_id}")
+        # print(f"Document data: {Document_data}")
 
+        # duration=Document_data['duration_seconds']
+        # model_id="gemini-2.5-pro"
 
-        video_file_name= file_name +".mp4"
-        bucket_name=file_location.split("/")[2] 
-        collection_name = message_data.get("collection_name")
-        #Creating the new Metadata entry in Firestore for highlights
-        doc_id=create_video_metadata(bucket_name, video_file_name,collection_name)
-
-        #Feching of created new Metadata entry from Firestore
-        Document_data=get_video_metadata(firestore_client, collection_name, doc_id)
-        print(f"Fetched metadata from Firestore document ID: {doc_id}")
-        print(f"Document data: {Document_data}")
-
-        duration=Document_data['duration_seconds']
-        model_id="gemini-2.5-pro"
-
-        print(f"Creating Highlight Reel... for {file_name}")
-        create_highlight_reel(file_location,duration,model_id)
+        # print(f"Creating Highlight Reel... for {file_name}")
+        # create_highlight_reel(file_location,duration,model_id)
 
 
 
