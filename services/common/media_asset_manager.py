@@ -49,6 +49,7 @@ class MediaAssetManager:
         file_category: str,
         file_name: str,
         public_url: Optional[str] = None,
+        source: str = "GCS",
         poster_url: str = "https://placehold.co/1280x720/000000/FFFFFF?text=Default+Poster",
         is_dummy: bool = False
     ) -> bool:
@@ -63,6 +64,7 @@ class MediaAssetManager:
             file_name (str): The original name of the file.
             public_url (Optional[str], optional): Publicly accessible URL for 
             the media file. Defaults to None.
+            source (str, optional): The source of the media file (e.g., "GCS", "youtube"). Defaults to "GCS".
             poster_url (str, optional): URL for a poster image. Defaults to a placeholder.
             is_dummy (bool, optional): Flag if this is dummy content. Defaults to False.
 
@@ -79,6 +81,7 @@ class MediaAssetManager:
             "file_path": file_path,
             "public_url": public_url,
             "content_type": content_type,
+            "source": source,
             "file_category": file_category,
             "upload_time": current_time,
             "last_updated": current_time,

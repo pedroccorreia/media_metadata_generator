@@ -45,6 +45,7 @@ app = Flask(__name__)
 def generate(
     prompt_text,
     video_uri,
+    source,
     system_instruction_text,
     response_schema,
     model_name="gemini-2.5-pro",
@@ -55,6 +56,7 @@ def generate(
     Args:
         prompt_text (str): The text prompt for the model.
         video_uri (str): The GCS URI of the video file (e.g., "gs://your-bucket/your-video.mp4").
+        source (str): The source of the video, e.g., "GCS" or "youtube".
         system_instruction_text (str): The system instruction for the model.
         response_schema (dict): The schema for the expected JSON output.
         model_name (str): The name of the generative model to use (default: "gemini-2.5-pro").
@@ -72,7 +74,11 @@ def generate(
     # Prepare the user prompt parts: one for the text instruction and one for the video file.
     msg1_text1 = types.Part.from_text(text=prompt_text)
     msg1_video1 = types.Part.from_uri(
-        file_uri=video_uri,
+       file_uri=video_uri,
+        mime_type="video/youtube" if source == "youtube" else "video/*",
+    )
+    msg1_video1 = types.Part.from_uri(
+       file_uri=video_uri,
         mime_type="video/*",
     )
 
@@ -122,7 +128,7 @@ def generate(
     return response.text
 
 
-def generate_previews(asset_id: str, file_location: str) -> Union[list, dict]:
+def generate_previews(asset_id: str, file_location: str, source: str) -> Union[list, dict]:
     """
     Generates a list of potential short video clips from a media asset using Gemini.
 
@@ -163,6 +169,7 @@ def generate_previews(asset_id: str, file_location: str) -> Union[list, dict]:
         raw_response = generate(
             prompt,
             file_location,
+            source,
             system_instructions_text,
             SHORTS_SCHEMA,
             model_name=model,
@@ -281,6 +288,7 @@ def handle_message():
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
+        source = message_data.get("source", "GCS")
 
         
         #log all input params
@@ -293,7 +301,7 @@ def handle_message():
         )
         
         # Validate that all required fields are present in the message.
-        if not all([asset_id, file_location, file_name]):
+        if not all([asset_id, file_location, file_name, source]):
             logger.error(
                 "Message missing required data: asset_id, file_location, or file_name",
                 extra={"extra_fields": {"message_data": message_data}},
@@ -318,9 +326,9 @@ def handle_message():
             asset_id, "previews", {"status": "processing"}
         )
         # Trigger the core logic to generate preview clips.
-        preview_results = generate_previews(asset_id, file_location)
+        preview_results = generate_previews(asset_id, file_location, source)
 
-        #### Trigger the core logic to generate highlights
+        #### Trigger the core logic to generate highlights only do this if source != 'youtube'
         # video_file_name= file_name +".mp4"
         # bucket_name=file_location.split("/")[2] 
         # collection_name = message_data.get("collection_name")
