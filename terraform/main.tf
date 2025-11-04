@@ -10,15 +10,16 @@ resource "google_project_service" "apis" {
     "storage.googleapis.com",
     "firestore.googleapis.com",
     "iam.googleapis.com",
-    "cloudbuild.googleapis.com",      # Needed for Cloud Run deployments if using source builds
-    "artifactregistry.googleapis.com", # Recommended for storing Docker images
-    "cloudscheduler.googleapis.com",   # For optional batch processing trigger
+    "cloudbuild.googleapis.com",           # Needed for Cloud Run deployments if using source builds
+    "artifactregistry.googleapis.com",     # Recommended for storing Docker images
+    "cloudscheduler.googleapis.com",       # For optional batch processing trigger
     "cloudresourcemanager.googleapis.com", # Implicit, but good to ensure
-    "aiplatform.googleapis.com",       # For Vertex AI services
-    "speech.googleapis.com"            # For Speech-to-Text API
+    "aiplatform.googleapis.com",           # For Vertex AI services
+    "speech.googleapis.com",               # For Speech-to-Text API
+    "discoveryengine.googleapis.com"       # For Vertex AI Search
   ])
-  project = var.project_id
-  service = each.key
+  project            = var.project_id
+  service            = each.key
   disable_on_destroy = false # Set to true if you want to disable APIs on `terraform destroy`
 }
 
@@ -33,7 +34,7 @@ resource "google_artifact_registry_repository" "docker_repo" {
   repository_id = var.artifact_registry_repo
   description   = "Docker repository for media metadata pipeline images"
   format        = "DOCKER"
-  depends_on = [google_project_service.apis["artifactregistry.googleapis.com"]]
+  depends_on    = [google_project_service.apis["artifactregistry.googleapis.com"]]
 }
 
 # Grant the Cloud Build service account permission to push images to the Artifact Registry.
@@ -52,12 +53,12 @@ resource "google_artifact_registry_repository_iam_member" "cloudbuild_ar_writer"
 
 # Creates the GCS buckets that will be used as inputs for the media pipeline.
 resource "google_storage_bucket" "input_buckets" {
-  for_each = toset(var.input_bucket_names)
-  project  = var.project_id
-  name     = each.key
-  location = var.region
+  for_each                    = toset(var.input_bucket_names)
+  project                     = var.project_id
+  name                        = each.key
+  location                    = var.region
   uniform_bucket_level_access = true
-  depends_on = [google_project_service.apis["storage.googleapis.com"]]
+  depends_on                  = [google_project_service.apis["storage.googleapis.com"]]
 }
 
 ################################################################################
@@ -69,8 +70,8 @@ resource "google_storage_bucket" "input_buckets" {
 # subscribes to this topic to kick off the entire workflow.
 # Messages to this topic will now need to be published manually or by another system.
 resource "google_pubsub_topic" "central_ingestion_topic" {
-  project = var.project_id
-  name    = "central-ingestion-topic"
+  project    = var.project_id
+  name       = "central-ingestion-topic"
   depends_on = [google_project_service.apis["pubsub.googleapis.com"]]
 }
 
@@ -111,7 +112,7 @@ resource "google_service_account" "batch_processor_sa" {
   project      = var.project_id
   account_id   = "batch-processor-sa"
   display_name = "Service Account for Batch Processor Cloud Run Service"
-  depends_on = [google_project_service.apis["iam.googleapis.com"]]
+  depends_on   = [google_project_service.apis["iam.googleapis.com"]]
 }
 
 # Consolidated Service Account for all Metadata Generators
@@ -123,7 +124,7 @@ resource "google_service_account" "metadata_generator_sa" {
   project      = var.project_id
   account_id   = "metadata-generator-sa"
   display_name = "Consolidated SA for Metadata Generator Cloud Run Services"
-  depends_on = [google_project_service.apis["iam.googleapis.com"]]
+  depends_on   = [google_project_service.apis["iam.googleapis.com"]]
 }
 
 ################################################################################
@@ -163,8 +164,8 @@ resource "google_project_iam_member" "metadata_generator_pubsub_subscriber" {
 resource "google_project_iam_member" "metadata_generator_gcs_admin" {
   project = var.project_id
   # Allows creating, reading, and deleting GCS objects (e.g., for transcription results).
-  role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
 }
 
 resource "google_project_iam_member" "metadata_generator_firestore_user" {
@@ -174,9 +175,9 @@ resource "google_project_iam_member" "metadata_generator_firestore_user" {
 }
 
 resource "google_project_iam_member" "metadata_generator_aiplatform_user" {
-  project = var.project_id
-  role    = "roles/aiplatform.user"
-  member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  project    = var.project_id
+  role       = "roles/aiplatform.user"
+  member     = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
 }
 
@@ -184,8 +185,8 @@ resource "google_project_iam_member" "metadata_generator_speech_client" {
   project = var.project_id
   # The 'Speech Admin' role is used to allow the transcription service to create
   # a recognizer on-the-fly if it doesn't already exist.
-  role    = "roles/speech.admin"
-  member  = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  role       = "roles/speech.admin"
+  member     = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_project_service.apis["speech.googleapis.com"]]
 }
 
@@ -240,34 +241,34 @@ resource "google_cloud_run_service_iam_member" "batch_processor_pubsub_invoker" 
   role     = "roles/run.invoker"
   # The member is the service account that Pub/Sub will impersonate to invoke the service.
   # This must match the service_account_email in the subscription's push_config.
-  member   = "serviceAccount:${google_service_account.batch_processor_sa.email}"
+  member     = "serviceAccount:${google_service_account.batch_processor_sa.email}"
   depends_on = [google_cloud_run_service.batch_processor]
 }
 
 resource "google_cloud_run_service_iam_member" "summaries_generator_pubsub_invoker" {
-  service  = "summaries-generator"
-  project  = var.project_id
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  service    = "summaries-generator"
+  project    = var.project_id
+  location   = var.region
+  role       = "roles/run.invoker"
+  member     = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.summaries_generator]
 }
 
 resource "google_cloud_run_service_iam_member" "transcription_generator_pubsub_invoker" {
-  service  = "transcription-generator"
-  project  = var.project_id
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  service    = "transcription-generator"
+  project    = var.project_id
+  location   = var.region
+  role       = "roles/run.invoker"
+  member     = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.transcription_generator]
 }
 
 resource "google_cloud_run_service_iam_member" "previews_generator_pubsub_invoker" {
-  service  = "previews-generator"
-  project  = var.project_id
-  location = var.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
+  service    = "previews-generator"
+  project    = var.project_id
+  location   = var.region
+  role       = "roles/run.invoker"
+  member     = "serviceAccount:${google_service_account.metadata_generator_sa.email}"
   depends_on = [google_cloud_run_service.previews_generator]
 }
 
@@ -285,10 +286,10 @@ data "google_project" "project" {
 # central metadata store for all processed assets.
 resource "google_firestore_database" "default_firestore_database" {
   project     = var.project_id
-  name        = "(default)" # The default database instance
-  location_id = var.region  # Use the same region as other resources
+  name        = "(default)"        # The default database instance
+  location_id = var.region         # Use the same region as other resources
   type        = "FIRESTORE_NATIVE" # Or "DATASTORE_MODE"
-  depends_on = [google_project_service.apis["firestore.googleapis.com"]]
+  depends_on  = [google_project_service.apis["firestore.googleapis.com"]]
 }
 
 ################################################################################
@@ -323,7 +324,7 @@ resource "google_cloud_run_service" "batch_processor" {
         }
       }
       container_concurrency = var.batch_processor_concurrency
-      timeout_seconds = 300 # 5 minutes default
+      timeout_seconds       = 300 # 5 minutes default
     }
   }
   traffic {
@@ -331,7 +332,7 @@ resource "google_cloud_run_service" "batch_processor" {
     latest_revision = true
   }
   autogenerate_revision_name = true
-  depends_on = [google_project_service.apis["run.googleapis.com"]]
+  depends_on                 = [google_project_service.apis["run.googleapis.com"]]
 }
 
 # Summaries Generator Cloud Run Service
@@ -354,7 +355,7 @@ resource "google_cloud_run_service" "summaries_generator" {
         }
       }
       container_concurrency = var.summaries_generator_concurrency
-      timeout_seconds = 600 # 10 minutes, can be adjusted for long tasks
+      timeout_seconds       = 600 # 10 minutes, can be adjusted for long tasks
     }
   }
   traffic {
@@ -422,7 +423,7 @@ resource "google_cloud_run_service" "previews_generator" {
         }
       }
       container_concurrency = var.previews_generator_concurrency
-      timeout_seconds = 600 # 10 minutes
+      timeout_seconds       = 600 # 10 minutes
     }
   }
   traffic {
@@ -440,13 +441,13 @@ resource "google_cloud_run_service" "previews_generator" {
 # This subscription connects the central ingestion topic to the dispatcher service.
 # It uses an authenticated push configuration with the dispatcher's specific service account.
 resource "google_pubsub_subscription" "batch_processor_sub" {
-  project = var.project_id
-  name    = "batch-processor-dispatcher-sub"
-  topic    = google_pubsub_topic.central_ingestion_topic.name
+  project              = var.project_id
+  name                 = "batch-processor-dispatcher-sub"
+  topic                = google_pubsub_topic.central_ingestion_topic.name
   ack_deadline_seconds = 600 # Up to 10 minutes
 
   dead_letter_policy {
-    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    dead_letter_topic     = google_pubsub_topic.dead_letter_topic.id
     max_delivery_attempts = 5
   }
 
@@ -464,13 +465,13 @@ resource "google_pubsub_subscription" "batch_processor_sub" {
 # These subscriptions connect each task topic to its corresponding generator service.
 # They all use the consolidated metadata generator service account for authentication.
 resource "google_pubsub_subscription" "summaries_sub" {
-  project = var.project_id
-  name    = "summaries-generator-sub"
-  topic   = google_pubsub_topic.summaries_topic.name
+  project              = var.project_id
+  name                 = "summaries-generator-sub"
+  topic                = google_pubsub_topic.summaries_topic.name
   ack_deadline_seconds = 600 # Adjust based on expected processing time
 
   dead_letter_policy {
-    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    dead_letter_topic     = google_pubsub_topic.dead_letter_topic.id
     max_delivery_attempts = 5
   }
 
@@ -483,13 +484,13 @@ resource "google_pubsub_subscription" "summaries_sub" {
 }
 
 resource "google_pubsub_subscription" "transcription_sub" {
-  project = var.project_id
-  name    = "transcription-generator-sub"
-  topic   = google_pubsub_topic.transcription_topic.name
+  project              = var.project_id
+  name                 = "transcription-generator-sub"
+  topic                = google_pubsub_topic.transcription_topic.name
   ack_deadline_seconds = 600 # Adjust for potentially long transcription times 
 
   dead_letter_policy {
-    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    dead_letter_topic     = google_pubsub_topic.dead_letter_topic.id
     max_delivery_attempts = 5
   }
 
@@ -502,20 +503,55 @@ resource "google_pubsub_subscription" "transcription_sub" {
 }
 
 resource "google_pubsub_subscription" "previews_sub" {
-  project = var.project_id
-  name    = "previews-generator-sub"
-  topic   = google_pubsub_topic.previews_topic.name
+  project              = var.project_id
+  name                 = "previews-generator-sub"
+  topic                = google_pubsub_topic.previews_topic.name
   ack_deadline_seconds = 600
 
   dead_letter_policy {
-    dead_letter_topic = google_pubsub_topic.dead_letter_topic.id
+    dead_letter_topic     = google_pubsub_topic.dead_letter_topic.id
     max_delivery_attempts = 5
   }
 
   push_config {
+
     push_endpoint = google_cloud_run_service.previews_generator.status[0].url
+
     oidc_token {
+
       service_account_email = google_service_account.metadata_generator_sa.email # Consolidated SA
+
     }
+
   }
+
 }
+
+
+
+################################################################################
+
+# Vertex AI Search
+
+################################################################################
+
+resource "google_discovery_engine_data_store" "firestore_datastore" {
+
+  project                     = var.project_id
+  location                    = "global"
+  data_store_id               = "nebula-foundry-data-store"
+  display_name                = "nebula-foundry-datastore"
+  industry_vertical           = "GENERIC"
+  solution_types              = ["SOLUTION_TYPE_SEARCH"]
+  content_config              = "NO_CONTENT"
+  create_advanced_site_search = false
+  
+  depends_on = [
+    google_firestore_database.default_firestore_database,
+    google_project_service.apis["discoveryengine.googleapis.com"]
+  ]
+
+
+}
+
+  

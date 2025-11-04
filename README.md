@@ -142,4 +142,11 @@ This will provision all the necessary resources: GCS buckets, Pub/Sub topics, Cl
 
 3.  **Monitor in Firestore**: You can now go to the Firestore console and view the `media_assets` collection. You will see a document with the ID `unique-asset-id-123`, and its `summary`, `transcription`, and `previews` fields will be updated in real-time as the services complete their tasks.
 
+
+4.  **Enable the search experience**: Terraform will create a empty datastore. You still need to go to AI Applications -> data store and connect it to the firestore database. Once it has indexed all items, the datastore will be enabled to be attached to an AI application (your search application). 
+
+Go to AI Application - Apps - Create App. 
+Choose Custom Search (general)
+Choose App Name, set location to global
+Choose the datastore that you've just created.
 ---
