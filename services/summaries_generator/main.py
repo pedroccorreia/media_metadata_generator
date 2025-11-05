@@ -357,22 +357,6 @@ def handle_message():
         file_name = message_data.get("file_name")
         source = message_data.get("source", "GCS")
 
-        if source == "youtube":
-            logger.info(
-                "Skipping summary generation for YouTube video as it is not applicable. Asset ID: %s",
-                asset_id,
-                extra={"extra_fields": {"asset_id": asset_id, "source": source}},
-            )
-            asset_manager.update_asset_metadata(
-                asset_id,
-                "summary",
-                {
-                    "status": "not_applicable",
-                    "error_message": "Not applicable for YouTube source",
-                },
-            )
-            return "", 204
-
         if not all([asset_id, file_location, file_name, source]):
             logger.error(
                 "Message missing required data: asset_id, file_location, file_name, or source.",

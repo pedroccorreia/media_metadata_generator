@@ -232,11 +232,12 @@ def handle_message():
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
+        source = message_data.get("source", "GCS")  # Default to GCS
 
         # Validate that all required fields are present in the message.
-        if not all([asset_id, file_location, file_name]):
+        if not all([asset_id, file_location, file_name, source]):
             logger.error(
-                "Message missing required data: asset_id, file_location or file_name.",
+                "Message missing required data: asset_id, file_location, file_name, or source.",
                 extra={"extra_fields": {"message_data": message_data}},
             )
             return "Bad Request: missing required data", 400
@@ -246,6 +247,7 @@ def handle_message():
                 "asset_id": asset_id,
                 "file_name": file_name,
                 "file_location": file_location,
+                "source": source,
             }
         }
         logger.info(
@@ -253,6 +255,20 @@ def handle_message():
             asset_id,
             extra=log_extra,
         )
+
+        # If the source is YouTube, skip transcription.
+        if source == "youtube":
+            logger.info(
+                "Skipping transcription for YouTube asset: %s",
+                asset_id,
+                extra=log_extra,
+            )
+            asset_manager.update_asset_metadata(
+                asset_id,
+                "transcription",
+                {"status": "skipped", "error_message": "Not applicable for YouTube source"},
+            )
+            return "", 204
 
         # Update the asset's status to 'processing' in Firestore.
         asset_manager.update_asset_metadata(

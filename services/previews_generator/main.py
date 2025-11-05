@@ -164,8 +164,6 @@ def generate_previews(asset_id: str, file_location: str, source: str) -> Union[l
         model = "gemini-2.5-flash"
 
         # Call the generative model to get potential preview clips.
-        logger.info("Input parameters: asset_id=%s, file_location=%s prompt=%s model=%s", asset_id, file_location, prompt, model)
-
         raw_response = generate(
             prompt,
             file_location,
