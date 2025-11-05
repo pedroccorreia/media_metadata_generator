@@ -35,6 +35,7 @@ app = Flask(__name__)
 def generate(
     prompt_text,
     video_uri,
+    source,
     system_instruction_text,
     response_schema,
     model_name="gemini-2.5-pro",
@@ -45,6 +46,7 @@ def generate(
     Args:
         prompt_text (str): The text prompt for the model.
         video_uri (str): The GCS URI of the video file (e.g., "gs://your-bucket/your-video.mp4").
+        source (str): The source of the video, e.g., "GCS" or "youtube".
         system_instruction_text (str): The system instruction for the model.
         model_name (str): The name of the generative model to use (default: "gemini-2.5-pro").
     Returns:
@@ -59,10 +61,14 @@ def generate(
 
     msg1_text1 = types.Part.from_text(text=prompt_text)
 
-    msg1_video1 = types.Part.from_uri(
-        file_uri=video_uri,
-        mime_type="video/*",
-    )
+    if source == "youtube":
+        msg1_video1 = types.Part.from_uri(
+            file_uri=video_uri, mime_type="video/youtube"
+        )
+    else:  # Default to GCS
+        msg1_video1 = types.Part.from_uri(
+            file_uri=video_uri, mime_type="video/*"
+        )
 
     si_text1 = system_instruction_text
 
@@ -102,7 +108,7 @@ def generate(
     return response.text
 
 
-def generate_summary(asset_id: str, file_location: str) -> dict:
+def generate_summary(asset_id: str, file_location: str, source: str) -> dict:
     """
     Generates a summary for a media asset using GenAI models.
 
@@ -110,6 +116,7 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
         asset_id (str): The ID of the asset.
         file_location (str): GCS URI of the media file.
     Returns:
+        source (str): The source of the media file (e.g., "GCS", "youtube").
         dict: A dictionary containing the result of the summary prompt,
               or an error dictionary if generation fails.
     """
@@ -129,6 +136,7 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
         raw_response = generate(
             prompt,
             file_location,
+            source,
             system_instructions_text,
             SUMMARY_SCHEMA,
             model_name=model,
@@ -160,7 +168,7 @@ def generate_summary(asset_id: str, file_location: str) -> dict:
         return {"error": f"Failed to process with Gemini: {str(e)}"}
 
 
-def generate_key_sections(asset_id: str, file_location: str) -> dict:
+def generate_key_sections(asset_id: str, file_location: str, source: str) -> dict:
     """
     Generates key sections for a media asset using GenAI models.
 
@@ -168,6 +176,7 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         asset_id (str): The ID of the asset.
         file_location (str): GCS URI of the media file.
     Returns:
+        source (str): The source of the media file (e.g., "GCS", "youtube").
         dict: A dictionary containing the result of the key sections prompt,
               or an error dictionary if generation fails.
     """
@@ -196,6 +205,7 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         raw_response = generate(
             prompt_content,
             file_location,
+            source,
             system_instruction_text,
             KEY_SECTIONS_SCHEMA,
             model_name=model_name,
@@ -227,7 +237,9 @@ def generate_key_sections(asset_id: str, file_location: str) -> dict:
         return {"error": f"Failed to process with Gemini: {str(e)}"}
 
 
-def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
+def generate_asset_categorization(
+    asset_id: str, file_location: str, source: str
+) -> dict:
     """
     Generates Detailed Categorization for a media asset using GenAI models.
 
@@ -235,6 +247,7 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
         asset_id (str): The ID of the asset.
         file_location (str): GCS URI of the media file.
     Returns:
+        source (str): The source of the media file (e.g., "GCS", "youtube").
         dict: A dictionary containing the result of the categorizations prompt,
               or an error dictionary if generation fails.
     """
@@ -287,6 +300,7 @@ def generate_asset_categorization(asset_id: str, file_location: str) -> dict:
         raw_response = generate(
             prompt_content,
             file_location,
+            source,
             system_instruction_text,
             ASSET_CATEGORIZATION_SCHEMA,
             model_name=model_name,
@@ -341,10 +355,11 @@ def handle_message():
         asset_id = message_data.get("asset_id")
         file_location = message_data.get("file_location")
         file_name = message_data.get("file_name")
+        source = message_data.get("source", "GCS")
 
-        if not all([asset_id, file_location, file_name]):
+        if not all([asset_id, file_location, file_name, source]):
             logger.error(
-                "Message missing required data: asset_id, file_location, or file_name.",
+                "Message missing required data: asset_id, file_location, file_name, or source.",
                 extra={"extra_fields": {"message_data": message_data}},
             )
             return "Bad Request: missing required data", 400
@@ -354,6 +369,7 @@ def handle_message():
                 "asset_id": asset_id,
                 "file_name": file_name,
                 "file_location": file_location,
+                "source": source,
             }
         }
         logger.info(
@@ -386,12 +402,12 @@ def handle_message():
         )
 
         # Generate both summary from asset
-        summary_results = generate_summary(asset_id, file_location)
+        summary_results = generate_summary(asset_id, file_location, source)
         # Obtains key sections
-        key_sections_results = generate_key_sections(asset_id, file_location)
+        key_sections_results = generate_key_sections(asset_id, file_location, source)
         # Obtains detailed categorization
         detailed_categorization_results = generate_asset_categorization(
-            asset_id, file_location
+            asset_id, file_location, source
         )
 
         # --- Consolidate results and handle partial failures ---

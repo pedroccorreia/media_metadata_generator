@@ -73,7 +73,15 @@ summaries_generator_image  = "us-central1-docker.pkg.dev/your-gcp-project-id/med
 transcription_generator_image = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/transcription_generator:latest"
 previews_generator_image   = "us-central1-docker.pkg.dev/your-gcp-project-id/media-pipeline-images/previews_generator:latest"
 ```
+#### 1.2 Enable terraform apis
 
+These will make your plan and apply commands work
+```bash
+gcloud services enable serviceusage.googleapis.com --project=[yourproject]
+```
+```bash
+gcloud services enable cloudresourcemanager.googleapis.com --project=[yourproject]
+```
 ### 2. Build and Push Docker Images
 
 This project is configured to use Google Cloud Build to build and push the service images directly to Artifact Registry. This removes the need for Docker to be installed on your local machine.

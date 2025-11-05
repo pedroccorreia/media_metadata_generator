@@ -113,8 +113,9 @@ def process_file_event(event_data):
     file_category = event_data.get("file_category")
     public_url = event_data.get("public_url")
     file_name = event_data.get("file_name")
+    source = event_data.get("source", "GCS")  # Default to GCS
 
-    if not all([file_location, content_type, asset_id, file_category, file_name]):
+    if not all([file_location, content_type, asset_id, file_category, file_name, source]):
         logger.warning(
             "Skipping invalid message due to missing fields.",
             extra={"extra_fields": {"event_data": event_data}},
@@ -129,6 +130,7 @@ def process_file_event(event_data):
             "content_type": content_type,
             "file_location": file_location,
             "public_url": public_url,
+            "source": source,
         }
     }
     logger.info("Received event for asset_id: %s", asset_id, extra=log_extra)
@@ -142,6 +144,7 @@ def process_file_event(event_data):
         file_category=file_category,
         file_name=file_name,
         public_url=public_url,
+        source=source,
     ):
         # The asset_manager already logs the detailed error.
         logger.error(
@@ -160,6 +163,7 @@ def process_file_event(event_data):
         "asset_id": asset_id,
         "file_location": file_location,
         "file_name": file_name,
+        "source": source,
     }
     encoded_message = json.dumps(message_data).encode("utf-8")
 

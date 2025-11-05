@@ -4,9 +4,15 @@ input_bucket_names = [
   "sample-project-input"
 ]
 
+# Start with placeholder images to run all the terraform script
+batch_processor_image ="us-docker.pkg.dev/cloudrun/container/hello"
+summaries_generator_image  = "us-docker.pkg.dev/cloudrun/container/hello"
+transcription_generator_image = "us-docker.pkg.dev/cloudrun/container/hello"
+previews_generator_image   = "us-docker.pkg.dev/cloudrun/container/hello"
 
-# Define your Docker image URLs explicitly here
-batch_processor_image      = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/batch_processor_dispatcher:latest"
-summaries_generator_image  = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/summaries_generator:latest"
-transcription_generator_image = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/transcription_generator:latest"
-previews_generator_image   = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/previews_generator:latest"
+# Once you deploy your infrastructure, update the artifact registry by running services/artifacts_build
+# Uncomment the lines below and run terraform to update to these images
+# batch_processor_image      = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/batch_processor_dispatcher:latest"
+# summaries_generator_image  = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/summaries_generator:latest"
+# transcription_generator_image = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/transcription_generator:latest"
+# previews_generator_image   = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/previews_generator:latest"

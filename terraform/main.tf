@@ -16,7 +16,8 @@ resource "google_project_service" "apis" {
     "cloudresourcemanager.googleapis.com", # Implicit, but good to ensure
     "aiplatform.googleapis.com",           # For Vertex AI services
     "speech.googleapis.com",               # For Speech-to-Text API
-    "discoveryengine.googleapis.com"       # For Vertex AI Search
+    "discoveryengine.googleapis.com",       # For Vertex AI Search
+    "bigquery.googleapis.com"
   ])
   project            = var.project_id
   service            = each.key
@@ -550,8 +551,99 @@ resource "google_discovery_engine_data_store" "firestore_datastore" {
     google_firestore_database.default_firestore_database,
     google_project_service.apis["discoveryengine.googleapis.com"]
   ]
-
-
 }
 
-  
+################################################################################
+# BigQuery for Dead-letter Topic
+################################################################################
+
+resource "google_bigquery_dataset" "topics" {
+  project    = var.project_id
+  dataset_id = "topics"
+  location   = var.region
+}
+
+resource "google_bigquery_table" "dead_letter_table" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.topics.dataset_id
+  table_id   = "dead_letter"
+
+  schema = <<EOF
+[
+  {
+    "name": "data",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  }
+]
+EOF
+}
+
+resource "google_project_iam_member" "pubsub_to_bigquery_writer" {
+  project = var.project_id
+  role    = "roles/bigquery.dataEditor"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription" "dead_letter_bq_sub" {
+  project = var.project_id
+  name    = "dead-letter-bq-subscription"
+  topic   = google_pubsub_topic.dead_letter_topic.name
+
+  bigquery_config {
+    table = "${google_bigquery_table.dead_letter_table.project}:${google_bigquery_table.dead_letter_table.dataset_id}.${google_bigquery_table.dead_letter_table.table_id}"
+  }
+
+  depends_on = [
+    google_project_iam_member.pubsub_to_bigquery_writer
+  ]
+}
+resource "google_pubsub_topic_iam_member" "pubsub_sa_dead_letter_publisher" {
+  project = var.project_id
+  topic   = google_pubsub_topic.dead_letter_topic.name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscriber" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.batch_processor_sub.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscriber_summaries" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.summaries_sub.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscriber_transcription" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.transcription_sub.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscriber_previews" {
+  project      = var.project_id
+  subscription = google_pubsub_subscription.previews_sub.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+resource "google_project_iam_member" "compute_sa_gcs_reader" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+}
+resource "google_project_iam_member" "compute_sa_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+}
+resource "google_project_iam_member" "compute_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+}
