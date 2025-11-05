@@ -10,6 +10,10 @@ summaries_generator_image  = "us-docker.pkg.dev/cloudrun/container/hello"
 transcription_generator_image = "us-docker.pkg.dev/cloudrun/container/hello"
 previews_generator_image   = "us-docker.pkg.dev/cloudrun/container/hello"
 
+
+# you can override the models that each worker uses
+summaries_generator_llm_model = ""gemini-2.5-pro"
+
 # Once you deploy your infrastructure, update the artifact registry by running services/artifacts_build
 # Uncomment the lines below and run terraform to update to these images
 # batch_processor_image      = "us-central1-docker.pkg.dev/sample-project/media-pipeline-images/batch_processor_dispatcher:latest"

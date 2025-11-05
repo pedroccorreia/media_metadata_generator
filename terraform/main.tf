@@ -344,17 +344,10 @@ resource "google_cloud_run_service" "summaries_generator" {
   template {
     spec {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
-      containers {
-        image = var.summaries_generator_image # Placeholder
         env {
-          name  = "GOOGLE_CLOUD_PROJECT"
-          value = var.project_id
+          name  = "LLM_MODEL"
+          value = var.summaries_generator_llm_model
         }
-        env {
-          name  = "GCP_REGION"
-          value = var.region
-        }
-      }
       container_concurrency = var.summaries_generator_concurrency
       timeout_seconds       = 600 # 10 minutes, can be adjusted for long tasks
     }
@@ -377,12 +370,12 @@ resource "google_cloud_run_service" "transcription_generator" {
       containers {
         image = var.transcription_generator_image # Placeholder
         env {
-          name  = "GOOGLE_CLOUD_PROJECT"
-          value = var.project_id
-        }
-        env {
           name  = "GCP_REGION"
           value = var.region
+        }
+        env {
+          name  = "LLM_MODEL"
+          value = "flash 2.5"
         }
         resources {
           limits = {
@@ -415,6 +408,10 @@ resource "google_cloud_run_service" "previews_generator" {
         env {
           name  = "GOOGLE_CLOUD_PROJECT"
           value = var.project_id
+        }
+        env {
+          name  = "LLM_MODEL"
+          value = "flash 2.5"
         }
         resources {
           limits = {

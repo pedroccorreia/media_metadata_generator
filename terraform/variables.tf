@@ -31,7 +31,7 @@ variable "batch_processor_image" {
 variable "summaries_generator_image" {
   description = "Docker image URL for the Summaries Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/summaries-generator:latest"
+  default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/summaries-generator:latest"
 }
 
 variable "transcription_generator_image" {
@@ -44,6 +44,24 @@ variable "previews_generator_image" {
   description = "Docker image URL for the Previews Generator Cloud Run service."
   type        = string
   # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/previews-generator:latest"
+}
+
+variable "summaries_generator_llm_model" {
+  description = "The LLM model to be used by the summaries generator service."
+  type        = string
+  default     = "gemini-2.5-flash"
+}
+
+variable "transcription_generator_llm_model" {
+  description = "The LLM model to be used by the transcription generator service."
+  type        = string
+  default     = "chirp"
+}
+
+variable "previews_generator_llm_model" {
+  description = "The LLM model to be used by the previews generator service."
+  type        = string
+  default     = "gemini-2.5-flash"
 }
 
 
