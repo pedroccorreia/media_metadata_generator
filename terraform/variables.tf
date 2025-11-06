@@ -15,6 +15,12 @@ variable "input_bucket_names" {
   default     = []
 }
 
+variable "output_bucket_name" {
+  description = "The Google Cloud Storage bucket name for output files."
+  type        = string
+  default     = "${var.project_id}-output"
+}
+
 variable "artifact_registry_repo" {
   description = "The name of the Artifact Registry repository to store Docker images."
   type        = string

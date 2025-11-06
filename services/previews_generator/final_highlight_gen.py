@@ -475,7 +475,7 @@ def create_highlight_reel(video_url: str,duration: int, model_id: str = 'gemini-
             if output_highlight_path:
                 print(f"✓ Successfully created highlight reel: {output_highlight_path}")
                
-                BUCKET_NAME = "fox-metadata-output" # Replace with your Output bucket name
+                BUCKET_NAME = os.environ.get("OUTPUT_BUCKET_NAME")
                 DESTINATION_BLOB_NAME = f"video-highlights/{output_file_name}"
                 storage_client = storage.Client()
                 bucket = storage_client.bucket(BUCKET_NAME)

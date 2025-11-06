@@ -1,0 +1,43 @@
+substitutions:
+  _BACKEND_URL: ''
+
+steps:
+# Build and push the ui-backend image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/ui-backend', 'ui-backend']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/ui-backend']
+
+# Deploy ui-backend to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: deploy-backend
+  entrypoint: gcloud
+  args: [
+    'run',
+    'deploy',
+    'ui-backend',
+    '--image', 'gcr.io/$PROJECT_ID/ui-backend',
+    '--platform', 'managed',
+    '--region', 'us-central1',
+    '--allow-unauthenticated',
+    '--set-env-vars', 'GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=us-central1'
+  ]
+
+# Build and push the ui image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--build-arg', 'BACKEND_URL=$_BACKEND_URL', '-t', 'gcr.io/$PROJECT_ID/ui', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/ui']
+
+# Deploy ui to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args: [
+    'run',
+    'deploy',
+    'ui',
+    '--image', 'gcr.io/$PROJECT_ID/ui',
+    '--platform', 'managed',
+    '--region', 'us-central1',
+    '--allow-unauthenticated'
+  ]
