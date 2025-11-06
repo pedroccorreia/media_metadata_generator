@@ -424,6 +424,10 @@ resource "google_cloud_run_service" "previews_generator" {
           name  = "LLM_MODEL"
           value = var.summaries_generator_llm_model
         }
+        env {
+          name  = "OUTPUT_BUCKET_NAME"
+          value = var.output_bucket_name
+        }
         resources {
           limits = {
             cpu    = "8"
