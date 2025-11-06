@@ -23,6 +23,11 @@ pytest.ini
 */.venv
 .pytest_cache
 
+#Remove node modules
+presentation/node_modules
+presentation/ui-backend/node_modules
+presentation/docs
+
 .venv/
 
 utils.sh

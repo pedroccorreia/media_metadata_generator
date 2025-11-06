@@ -18,7 +18,7 @@ variable "input_bucket_names" {
 variable "output_bucket_name" {
   description = "The Google Cloud Storage bucket name for output files."
   type        = string
-  default     = "fox-metadata-output"
+  default     = "${var.project_id}-output"
 }
 
 variable "artifact_registry_repo" {
