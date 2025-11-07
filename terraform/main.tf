@@ -552,8 +552,8 @@ resource "google_discovery_engine_data_store" "firestore_datastore" {
 
   project                     = var.project_id
   location                    = "global"
-  data_store_id               = "nebula-foundry-data-store"
-  display_name                = "nebula-foundry-datastore"
+  data_store_id               = "${var.project_id}-data-store"
+  display_name                = "Datastore for Metadata"
   industry_vertical           = "GENERIC"
   solution_types              = ["SOLUTION_TYPE_SEARCH"]
   content_config              = "NO_CONTENT"
@@ -647,15 +647,93 @@ resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscrib
 resource "google_project_iam_member" "compute_sa_gcs_reader" {
   project = var.project_id
   role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 resource "google_project_iam_member" "compute_sa_artifact_registry_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 resource "google_project_iam_member" "compute_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+#### UI Deployment
+resource "google_service_account" "ui_backend_sa" {
+  project =  var.project_id
+  account_id   = "ui-backend-sa"
+  display_name = "UI Backend Service Account"
+  depends_on   = [google_project_service.apis["iam.googleapis.com"]]
+}
+
+resource "google_project_iam_member" "ui_backend_sa_firebase_admin" {
+  project = var.project_id
+  role    = "roles/firebase.admin"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+resource "google_project_iam_member" "ui_backend_sa_ai_platform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+resource "google_project_iam_member" "ui_backend_sa_datastore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+# services
+# The UI Cloud Run Service
+# 1. The Cloud Run Service
+# This resource is based directly on your YAML's 'spec'
+resource "google_cloud_run_service" "ui_service" {
+  name     = "ui"
+  location = var.region
+  project  = var.project_id
+  template {
+    spec {
+      service_account_name  = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+      containers {
+        image = "gcr.io/${var.project_id}/ui"
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+      }
+    }
+  }
+}
+
+
+# The 'ui-backend' Cloud Run Service
+resource "google_cloud_run_service" "ui_backend_service" {
+  name     = "ui-backend"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    spec {
+    
+      service_account_name = google_service_account.ui_backend_sa.email
+      containers {
+        image = "gcr.io/${var.project_id}/ui-backend"
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+      }
+    }
+  }
 }

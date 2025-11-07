@@ -20,5 +20,8 @@ if (dataSource === 'remote') {
 }
 
 export async function getContent() {
-  return await contentPromise;
+  console.log(`Fetching content from ${dataSource} data source...`);
+  const content = await contentPromise;
+  console.log(`Fetched ${content.movies.length} movies.`);
+  return content;
 }

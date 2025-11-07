@@ -4,8 +4,10 @@ import { getContent } from '@/lib/data';
 import { MovieCard } from '@/components/movie-card';
 
 export default async function MoviesPage() {
+  console.log('Rendering MoviesPage...');
   const content = await getContent();
   const movies = content.movies.filter(movie => movie.contentType === 'movie');
+  console.log(`MoviesPage received ${movies.length} movies.`);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">

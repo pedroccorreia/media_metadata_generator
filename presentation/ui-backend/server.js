@@ -15,12 +15,14 @@ app.use(express.json());
 app.get('/api/movies', async (req, res) => {
   const collectionName = process.env.FIRESTORE_COLLECTION || 'media_assets';
   try {
+    console.log(`Fetching '${collectionName}' from Firestore`);
     const moviesCollection = db.collection(collectionName);
     const movieSnapshot = await moviesCollection.get();
     const movieList = movieSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    console.log(`Fetched '${collectionName}' from Firestore with ${movieList.length} movies`);
     res.json(movieList);
   } catch (error) {
     console.error(`Error fetching '${collectionName}' from Firestore:`, error);

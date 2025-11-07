@@ -18,7 +18,7 @@ variable "input_bucket_names" {
 variable "output_bucket_name" {
   description = "The Google Cloud Storage bucket name for output files."
   type        = string
-  default     = "${var.project_id}-output"
+  default     = "output-bucket"
 }
 
 variable "artifact_registry_repo" {
@@ -31,25 +31,25 @@ variable "artifact_registry_repo" {
 variable "batch_processor_image" {
   description = "Docker image URL for the Batch Processor Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/batch-processor-dispatcher:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "summaries_generator_image" {
   description = "Docker image URL for the Summaries Generator Cloud Run service."
   type        = string
-  default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/summaries-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "transcription_generator_image" {
   description = "Docker image URL for the Transcription Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/transcription-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "previews_generator_image" {
   description = "Docker image URL for the Previews Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/previews-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "summaries_generator_llm_model" {
