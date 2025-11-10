@@ -422,7 +422,7 @@ resource "google_cloud_run_service" "previews_generator" {
         }
         env {
           name  = "LLM_MODEL"
-          value = var.summaries_generator_llm_model
+          value = var.previews_generator_llm_model
         }
         env {
           name  = "OUTPUT_BUCKET_NAME"
@@ -691,7 +691,7 @@ resource "google_project_iam_member" "ui_backend_sa_datastore_user" {
 # 1. The Cloud Run Service
 # This resource is based directly on your YAML's 'spec'
 resource "google_cloud_run_service" "ui_service" {
-  name     = "ui"
+  name     = "nebula-foundry-ui"
   location = var.region
   project  = var.project_id
   template {
@@ -715,7 +715,7 @@ resource "google_cloud_run_service" "ui_service" {
 
 # The 'ui-backend' Cloud Run Service
 resource "google_cloud_run_service" "ui_backend_service" {
-  name     = "ui-backend"
+  name     = "nebula-foundry-ui-backend"
   location = var.region
   project  = var.project_id
 
