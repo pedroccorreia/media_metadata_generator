@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:20
 
 # Create and change to the app directory.
 WORKDIR /app
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies.
-RUN npm install --production
+RUN npm ci --omit=dev
 
 # Copy local business logic to the container image.
 COPY . .
