@@ -15,6 +15,12 @@ variable "input_bucket_names" {
   default     = []
 }
 
+variable "output_bucket_name" {
+  description = "The Google Cloud Storage bucket name for output files."
+  type        = string
+  default     = "output-bucket"
+}
+
 variable "artifact_registry_repo" {
   description = "The name of the Artifact Registry repository to store Docker images."
   type        = string
@@ -25,26 +31,57 @@ variable "artifact_registry_repo" {
 variable "batch_processor_image" {
   description = "Docker image URL for the Batch Processor Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/batch-processor-dispatcher:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "summaries_generator_image" {
   description = "Docker image URL for the Summaries Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/summaries-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "transcription_generator_image" {
   description = "Docker image URL for the Transcription Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/transcription-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "previews_generator_image" {
   description = "Docker image URL for the Previews Generator Cloud Run service."
   type        = string
-  # default     = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repo}/previews-generator:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "nebula_foundry_ui_image" {
+  description = "Docker image URL for the Nebula Foundry UI Cloud Run service."
+  type = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
+variable "nebula_foundry_ui_backend_image" {
+  description = "Docker image URL for the Nebula Foundry UI Backend Cloud Run service."
+  type = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
+variable "summaries_generator_llm_model" {
+  description = "The LLM model to be used by the summaries generator service."
+  type        = string
+  default     = "gemini-2.5-flash"
+}
+
+variable "transcription_generator_llm_model" {
+  description = "The LLM model to be used by the transcription generator service."
+  type        = string
+  default     = "chirp"
+}
+
+variable "previews_generator_llm_model" {
+  description = "The LLM model to be used by the previews generator service."
+  type        = string
+  default     = "gemini-2.5-flash"
+}
+
 
 
 # Concurrency threshold for dispatcher and metadata generator services

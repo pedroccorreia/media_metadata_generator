@@ -6,7 +6,7 @@
 resource "google_project_service" "apis" {
   for_each = toset([
     "pubsub.googleapis.com",
-    "run.googleapis.com",
+    "run.googleapis.com",           # Cloud Run Admin API for managing Cloud Run services
     "storage.googleapis.com",
     "firestore.googleapis.com",
     "iam.googleapis.com",
@@ -202,7 +202,7 @@ resource "google_project_iam_member" "metadata_generator_speech_client" {
 resource "google_project_iam_member" "aiplatform_sa_gcs_reader" {
   project    = var.project_id
   role       = "roles/storage.objectViewer"
-  member     = "serviceAccount:service-409545154269@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
 }
 
@@ -345,14 +345,14 @@ resource "google_cloud_run_service" "summaries_generator" {
     spec {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
-        image = var.summaries_generator_image # Placeholder
-        env {
-          name  = "GOOGLE_CLOUD_PROJECT"
-          value = var.project_id
-        }
+        image = var.summaries_generator_image
         env {
           name  = "GCP_REGION"
           value = var.region
+        }
+        env {
+          name  = "LLM_MODEL"
+          value = var.summaries_generator_llm_model
         }
       }
       container_concurrency = var.summaries_generator_concurrency
@@ -375,14 +375,18 @@ resource "google_cloud_run_service" "transcription_generator" {
     spec {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
-        image = var.transcription_generator_image # Placeholder
-        env {
-          name  = "GOOGLE_CLOUD_PROJECT"
-          value = var.project_id
-        }
+        image = var.transcription_generator_image 
         env {
           name  = "GCP_REGION"
           value = var.region
+        }
+        env {
+          name  = "LLM_MODEL"
+          value = var.transcription_generator_llm_model
+        }
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
         }
         resources {
           limits = {
@@ -415,6 +419,18 @@ resource "google_cloud_run_service" "previews_generator" {
         env {
           name  = "GOOGLE_CLOUD_PROJECT"
           value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+        env {
+          name  = "LLM_MODEL"
+          value = var.previews_generator_llm_model
+        }
+        env {
+          name  = "OUTPUT_BUCKET_NAME"
+          value = var.output_bucket_name
         }
         resources {
           limits = {
@@ -540,8 +556,8 @@ resource "google_discovery_engine_data_store" "firestore_datastore" {
 
   project                     = var.project_id
   location                    = "global"
-  data_store_id               = "nebula-foundry-data-store"
-  display_name                = "nebula-foundry-datastore"
+  data_store_id               = "${var.project_id}-data-store"
+  display_name                = "Datastore for Metadata"
   industry_vertical           = "GENERIC"
   solution_types              = ["SOLUTION_TYPE_SEARCH"]
   content_config              = "NO_CONTENT"
@@ -635,15 +651,113 @@ resource "google_pubsub_subscription_iam_member" "pubsub_sa_dead_letter_subscrib
 resource "google_project_iam_member" "compute_sa_gcs_reader" {
   project = var.project_id
   role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 resource "google_project_iam_member" "compute_sa_artifact_registry_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 resource "google_project_iam_member" "compute_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:407607324339-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "compute_sa_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "compute_sa_ui_backend_sa_user" {
+  service_account_id = google_service_account.ui_backend_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+#### UI Deployment
+resource "google_service_account" "ui_backend_sa" {
+  project =  var.project_id
+  account_id   = "ui-backend-sa"
+  display_name = "UI Backend Service Account"
+  depends_on   = [google_project_service.apis["iam.googleapis.com"]]
+}
+
+resource "google_service_account_iam_member" "ui_backend_sa_token_creator" {
+  service_account_id = google_service_account.ui_backend_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+resource "google_project_iam_member" "ui_backend_sa_firebase_admin" {
+  project = var.project_id
+  role    = "roles/firebase.admin"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+resource "google_project_iam_member" "ui_backend_sa_ai_platform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+resource "google_project_iam_member" "ui_backend_sa_datastore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
+# UI Services
+resource "google_cloud_run_service" "ui_service" {
+  name     = "nebula-foundry-ui"
+  location = var.region
+  project  = var.project_id
+  template {
+    spec {
+      service_account_name  = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+      containers {
+        image = var.nebula_foundry_ui_image
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+      }
+    }
+  }
+}
+
+resource "google_service_account_iam_member" "default_account_iam" {
+  service_account_id = "projects/-/serviceAccounts/${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+
+resource "google_cloud_run_service" "ui_backend_service" {
+  name     = "nebula-foundry-ui-backend"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    spec {
+    
+      service_account_name = google_service_account.ui_backend_sa.email
+      containers {
+        image = var.nebula_foundry_ui_backend_image
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+      }
+    }
+  }
 }

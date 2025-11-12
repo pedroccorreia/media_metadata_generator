@@ -28,6 +28,7 @@ project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 # A location must be specified for Vertex AI
 location = os.environ.get("GCP_REGION", "us-central1")
 asset_manager = MediaAssetManager(project_id=project_id)
+llm_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
 
 app = Flask(__name__)
 
@@ -38,7 +39,7 @@ def generate(
     source,
     system_instruction_text,
     response_schema,
-    model_name="gemini-2.5-pro",
+    model_name=llm_model,
 ) -> str:
     """ "
     Common function that will execute the prompts as per the inputs and return the
@@ -53,6 +54,7 @@ def generate(
         str: The generated text response from the model.
 
     """
+    logger.info(f"Using model: {model_name}")
     client = genai.Client(
         vertexai=True,
         project=project_id,
@@ -132,14 +134,13 @@ def generate_summary(asset_id: str, file_location: str, source: str) -> dict:
             Please analyze the following video and provide summary, itemized_summary and subject_topics.
             Avoid any additional comment or text.
         """
-        model = "gemini-2.5-flash"
         raw_response = generate(
             prompt,
             file_location,
             source,
             system_instructions_text,
             SUMMARY_SCHEMA,
-            model_name=model,
+            model_name=llm_model,
         )
         summary_data = json.loads(raw_response)
 
@@ -200,15 +201,13 @@ def generate_key_sections(asset_id: str, file_location: str, source: str) -> dic
             Your task is to analyze the provided video and extract all the moments clips. 
             For each clip, you need to classify the type of moment and provide the precise start and end timestamps. """
         # Define a specific model so that the default one is not used
-        model_name = "gemini-2.5-pro"
-        # retrieve the result
         raw_response = generate(
             prompt_content,
             file_location,
             source,
             system_instruction_text,
             KEY_SECTIONS_SCHEMA,
-            model_name=model_name,
+            model_name=llm_model,
         )
         key_sections_data = json.loads(raw_response)
 
@@ -295,15 +294,13 @@ def generate_asset_categorization(
             Your task is to analyze the provided video and extract all the moments clips. 
             For each clip, you need to classify the type of moment and provide the precise start and end timestamps. """
         # Define a specific model so that the default one is not used
-        model_name = "gemini-2.5-flash"
-        # retrieve the result
         raw_response = generate(
             prompt_content,
             file_location,
             source,
             system_instruction_text,
             ASSET_CATEGORIZATION_SCHEMA,
-            model_name=model_name,
+            model_name=llm_model,
         )
         detailed_categorization_data = json.loads(raw_response)
 

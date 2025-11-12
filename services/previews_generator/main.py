@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 asset_manager = MediaAssetManager(project_id=project_id)
+llm_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
 
 storage_client = storage.Client()
 firestore_client = firestore.Client()
@@ -48,7 +49,7 @@ def generate(
     source,
     system_instruction_text,
     response_schema,
-    model_name="gemini-2.5-pro",
+    model_name=llm_model,
 ) -> str:
     """ "
     Invokes a generative AI model with a video and text prompt to generate structured data.
@@ -65,6 +66,7 @@ def generate(
         str: The generated JSON string response from the model.
 
     """
+    logger.info(f"Using model: {model_name}")
     client = genai.Client(
         vertexai=True,
         project=project_id,
@@ -161,16 +163,13 @@ def generate_previews(asset_id: str, file_location: str, source: str) -> Union[l
         Minimum scene duration should be 30 seconds.
         No spoilers should be included. No results should be shown on screen.
         """
-        model = "gemini-2.5-flash"
-
-        # Call the generative model to get potential preview clips.
         raw_response = generate(
             prompt,
             file_location,
             source,
             system_instructions_text,
             SHORTS_SCHEMA,
-            model_name=model,
+            model_name=llm_model,
         )
         # Parse the JSON string response into a Python list.
         shorts_data = json.loads(raw_response)
@@ -339,7 +338,7 @@ def handle_message():
         # print(f"Document data: {Document_data}")
 
         # duration=Document_data['duration_seconds']
-        # model_id="gemini-2.5-pro"
+        # model_id=llm_model
 
         # print(f"Creating Highlight Reel... for {file_name}")
         # create_highlight_reel(file_location,duration,model_id)

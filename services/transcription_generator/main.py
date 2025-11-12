@@ -28,6 +28,7 @@ project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 location = os.environ.get("GCP_REGION", "us-central1")
 asset_manager = MediaAssetManager(project_id=project_id)
 storage_client = storage.Client(project=project_id)
+llm_model = os.environ.get("LLM_MODEL", "chirp")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -124,7 +125,7 @@ def generate_transcription(asset_id: str, video_gcs_uri: str) -> dict:
                 parent=f"projects/{project_id}/locations/{location}",
                 recognizer_id=recognizer_id,
                 recognizer=cloud_speech.Recognizer(
-                    language_codes=[language_code], model="chirp"
+                    language_codes=[language_code], model=llm_model
                 ),
             )
             recognizer = speech_client.create_recognizer(
