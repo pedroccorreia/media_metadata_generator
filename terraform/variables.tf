@@ -52,6 +52,18 @@ variable "previews_generator_image" {
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
+variable "nebula_foundry_ui_image" {
+  description = "Docker image URL for the Nebula Foundry UI Cloud Run service."
+  type = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
+variable "nebula_foundry_ui_backend_image" {
+  description = "Docker image URL for the Nebula Foundry UI Backend Cloud Run service."
+  type = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
+}
+
 variable "summaries_generator_llm_model" {
   description = "The LLM model to be used by the summaries generator service."
   type        = string
@@ -69,6 +81,7 @@ variable "previews_generator_llm_model" {
   type        = string
   default     = "gemini-2.5-flash"
 }
+
 
 
 # Concurrency threshold for dispatcher and metadata generator services

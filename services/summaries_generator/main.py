@@ -28,7 +28,7 @@ project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 # A location must be specified for Vertex AI
 location = os.environ.get("GCP_REGION", "us-central1")
 asset_manager = MediaAssetManager(project_id=project_id)
-llm_model = os.environ.get("LLM_MODEL", "gemini-1.5-flash")
+llm_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
 
 app = Flask(__name__)
 
@@ -54,6 +54,7 @@ def generate(
         str: The generated text response from the model.
 
     """
+    logger.info(f"Using model: {model_name}")
     client = genai.Client(
         vertexai=True,
         project=project_id,

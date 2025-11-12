@@ -6,7 +6,7 @@
 resource "google_project_service" "apis" {
   for_each = toset([
     "pubsub.googleapis.com",
-    "run.googleapis.com",
+    "run.googleapis.com",           # Cloud Run Admin API for managing Cloud Run services
     "storage.googleapis.com",
     "firestore.googleapis.com",
     "iam.googleapis.com",
@@ -202,7 +202,7 @@ resource "google_project_iam_member" "metadata_generator_speech_client" {
 resource "google_project_iam_member" "aiplatform_sa_gcs_reader" {
   project    = var.project_id
   role       = "roles/storage.objectViewer"
-  member     = "serviceAccount:service-409545154269@gcp-sa-aiplatform.iam.gserviceaccount.com"
+  member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-aiplatform.iam.gserviceaccount.com"
   depends_on = [google_project_service.apis["aiplatform.googleapis.com"]]
 }
 
@@ -375,7 +375,7 @@ resource "google_cloud_run_service" "transcription_generator" {
     spec {
       service_account_name = google_service_account.metadata_generator_sa.email # Consolidated SA
       containers {
-        image = var.transcription_generator_image # Placeholder
+        image = var.transcription_generator_image 
         env {
           name  = "GCP_REGION"
           value = var.region
@@ -383,6 +383,10 @@ resource "google_cloud_run_service" "transcription_generator" {
         env {
           name  = "LLM_MODEL"
           value = var.transcription_generator_llm_model
+        }
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
         }
         resources {
           limits = {
@@ -660,6 +664,18 @@ resource "google_project_iam_member" "compute_log_writer" {
   member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
+resource "google_project_iam_member" "compute_sa_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "compute_sa_ui_backend_sa_user" {
+  service_account_id = google_service_account.ui_backend_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
 #### UI Deployment
 resource "google_service_account" "ui_backend_sa" {
   project =  var.project_id
@@ -686,10 +702,7 @@ resource "google_project_iam_member" "ui_backend_sa_datastore_user" {
   member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
 }
 
-# services
-# The UI Cloud Run Service
-# 1. The Cloud Run Service
-# This resource is based directly on your YAML's 'spec'
+# UI Services
 resource "google_cloud_run_service" "ui_service" {
   name     = "nebula-foundry-ui"
   location = var.region
@@ -698,7 +711,7 @@ resource "google_cloud_run_service" "ui_service" {
     spec {
       service_account_name  = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
       containers {
-        image = "gcr.io/${var.project_id}/ui"
+        image = var.nebula_foundry_ui_image
         env {
           name  = "GCP_PROJECT_ID"
           value = var.project_id
@@ -712,8 +725,13 @@ resource "google_cloud_run_service" "ui_service" {
   }
 }
 
+resource "google_service_account_iam_member" "default_account_iam" {
+  service_account_id = "projects/-/serviceAccounts/${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
 
-# The 'ui-backend' Cloud Run Service
+
 resource "google_cloud_run_service" "ui_backend_service" {
   name     = "nebula-foundry-ui-backend"
   location = var.region
@@ -724,7 +742,7 @@ resource "google_cloud_run_service" "ui_backend_service" {
     
       service_account_name = google_service_account.ui_backend_sa.email
       containers {
-        image = "gcr.io/${var.project_id}/ui-backend"
+        image = var.nebula_foundry_ui_backend_image
         env {
           name  = "GCP_PROJECT_ID"
           value = var.project_id

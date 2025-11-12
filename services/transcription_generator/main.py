@@ -29,7 +29,6 @@ location = os.environ.get("GCP_REGION", "us-central1")
 asset_manager = MediaAssetManager(project_id=project_id)
 storage_client = storage.Client(project=project_id)
 llm_model = os.environ.get("LLM_MODEL", "chirp")
-llm_model = os.environ.get("LLM_MODEL", "chirp")
 
 # Initialize Flask app
 app = Flask(__name__)

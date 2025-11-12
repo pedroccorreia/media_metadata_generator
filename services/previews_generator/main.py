@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
 asset_manager = MediaAssetManager(project_id=project_id)
-llm_model = os.environ.get("LLM_MODEL", "gemini-1.5-flash")
+llm_model = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
 
 storage_client = storage.Client()
 firestore_client = firestore.Client()
@@ -66,6 +66,7 @@ def generate(
         str: The generated JSON string response from the model.
 
     """
+    logger.info(f"Using model: {model_name}")
     client = genai.Client(
         vertexai=True,
         project=project_id,
