@@ -7,6 +7,7 @@ import type { Short, ShortWithMovieInfo, Movie } from '@/lib/types';
 import { ArrowRight } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { logger } from '@/lib/logger';
 
 // Helper to convert a Clip to a Short
 const clipToShort = (clip: any, index: number, movie: Movie): Short => ({
@@ -44,6 +45,7 @@ const getShortsForSwimlane = (movies: Movie[], count: number): ShortWithMovieInf
 };
 
 export default async function BrowsePage() {
+  logger.log('Rendering Browse page');
   const content = await getContent();
   const allShorts: ShortWithMovieInfo[] = content.movies.flatMap((movie) =>
     (movie.previews?.clips || []).map((clip, index) => {

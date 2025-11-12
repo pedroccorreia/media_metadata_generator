@@ -1,49 +1,41 @@
 
 const express = require('express');
-const admin = require('firebase-admin');
-const { movieChat, MovieChatInputSchema } = require('./movie-chat.js');
+const http =require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const { movieChat } = require('./movie-chat');
+const logger = require('./logger');
 
-// TODO: Replace with your service account key
-admin.initializeApp();
-
-const db = admin.firestore();
 const app = express();
-const port = process.env.PORT || 8080;
-
-app.use(express.json());
-
-app.get('/api/movies', async (req, res) => {
-  const collectionName = process.env.FIRESTORE_COLLECTION || 'media_assets';
-  try {
-    console.log(`Fetching '${collectionName}' from Firestore`);
-    const moviesCollection = db.collection(collectionName);
-    const movieSnapshot = await moviesCollection.get();
-    const movieList = movieSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    console.log(`Fetched '${collectionName}' from Firestore with ${movieList.length} movies`);
-    res.json(movieList);
-  } catch (error) {
-    console.error(`Error fetching '${collectionName}' from Firestore:`, error);
-    res.status(500).send('Error fetching data from Firestore');
+app.use(cors());
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*'
   }
 });
 
-app.post('/api/chat', async (req, res) => {
+const PORT = process.env.PORT || 3001;
+
+io.on('connection', (socket) => {
+  logger.log('a user connected');
+
+  socket.on('disconnect', () => {
+    logger.log('user disconnected');
+  });
+
+  socket.on('chat message', async (msg) => {
     try {
-        const validationResult = MovieChatInputSchema.safeParse(req.body);
-        if (!validationResult.success) {
-            return res.status(400).json({ error: validationResult.error.flatten() });
-        }
-        const output = await movieChat(validationResult.data);
-        res.json(output);
-    } catch (error) {
-        console.error('Error in /api/chat:', error);
-        res.status(500).send('Error processing chat request');
+      const result = await movieChat(msg);
+      socket.emit('chat message', result);
+    } catch (e) {
+      logger.error(e);
+      socket.emit('error', 'An error occurred');
     }
+  });
 });
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+server.listen(PORT, () => {
+  logger.log(`Server is running on port ${PORT}`);
 });
+3

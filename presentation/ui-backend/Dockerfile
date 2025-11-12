@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies.
-RUN npm ci --omit=dev
+RUN rm -f package-lock.json && npm install --production
 
 # Copy local business logic to the container image.
 COPY . .

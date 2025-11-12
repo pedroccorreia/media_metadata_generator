@@ -2,27 +2,6 @@ substitutions:
   _BACKEND_URL: ''
 
 steps:
-# Build and push the ui-backend image
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/media-pipeline-images/nebula-foundry-ui-backend', 'ui-backend']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/media-pipeline-images/nebula-foundry-ui-backend']
-
-# Deploy ui-backend to Cloud Run
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  id: deploy-backend
-  entrypoint: gcloud
-  args: [
-    'run',
-    'deploy',
-    'nebula-foundry-ui-backend',
-    '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/media-pipeline-images/nebula-foundry-ui-backend',
-    '--platform', 'managed',
-    '--region', 'us-central1',
-    '--allow-unauthenticated',
-    '--set-env-vars', 'GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=us-central1'
-  ]
-
 # Build and push the ui image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '--build-arg', 'BACKEND_URL=$_BACKEND_URL', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/media-pipeline-images/nebula-foundry-ui', '.']
@@ -39,5 +18,5 @@ steps:
     '--image', 'us-central1-docker.pkg.dev/$PROJECT_ID/media-pipeline-images/nebula-foundry-ui',
     '--platform', 'managed',
     '--region', 'us-central1',
-    '--allow-unauthenticated'
+    # '--allow-unauthenticated'
   ]
