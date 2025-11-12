@@ -1,4 +1,5 @@
 'use server';
+import { logger } from '@/lib/logger';
 /**
  * @fileOverview A movie chat agent that uses grounded search.
  *
@@ -37,7 +38,7 @@ export async function movieChat(input: MovieChatInput): Promise<MovieChatOutput>
       content: [{text: message.content}]
   }));
 
-  console.log('Chat prompt '+ input.query)
+  logger.log('Chat prompt '+ input.query)
   let output;
   try {
     const result = await ai.generate({
@@ -48,7 +49,7 @@ export async function movieChat(input: MovieChatInput): Promise<MovieChatOutput>
 
     output = result.text;
   } catch (error) {
-    console.error('Error during AI generation:', error);
+    logger.error('Error during AI generation:', error);
     throw error; // Re-throw the error after logging
   }
   

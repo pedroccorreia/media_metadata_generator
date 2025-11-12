@@ -2,17 +2,18 @@
 import { content as localContent } from '@/data/content';
 import { getMovies } from './firestore';
 import type { Movie } from './types';
+import { logger } from '@/lib/logger';
 
 const dataSource = 'remote';
 
 export async function getContent() {
-  console.log(`Fetching content from ${dataSource} data source...`);
+  logger.log(`Fetching content from ${dataSource} data source...`);
   if (dataSource === 'remote') {
-    console.log("Using remote data source.");
+    logger.log("Using remote data source.");
     const movies = await getMovies();
     return { movies };
   } else {
-    console.log("Using local data source.");
+    logger.log("Using local data source.");
     return localContent;
   }
 }

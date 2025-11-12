@@ -2,12 +2,13 @@
 import Link from 'next/link';
 import { getContent } from '@/lib/data';
 import { MovieCard } from '@/components/movie-card';
+import { logger } from '@/lib/logger';
 
 export default async function MoviesPage() {
-  console.log('Rendering MoviesPage...');
+  logger.log('Rendering MoviesPage...');
   const content = await getContent();
-  const movies = content.movies.filter(movie => movie.contentType === 'movie');
-  console.log(`MoviesPage received ${movies.length} movies.`);
+  const movies = content.movies;
+  logger.log(`MoviesPage received ${movies.length} videos.`);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">

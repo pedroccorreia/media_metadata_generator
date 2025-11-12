@@ -684,6 +684,12 @@ resource "google_service_account" "ui_backend_sa" {
   depends_on   = [google_project_service.apis["iam.googleapis.com"]]
 }
 
+resource "google_service_account_iam_member" "ui_backend_sa_token_creator" {
+  service_account_id = google_service_account.ui_backend_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
 resource "google_project_iam_member" "ui_backend_sa_firebase_admin" {
   project = var.project_id
   role    = "roles/firebase.admin"

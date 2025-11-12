@@ -5,15 +5,6 @@ import { MovieClientPage } from './client-page';
 import type { Movie } from '@/lib/types';
 
 
-// ✅ Add this function to your page
-export async function generateStaticParams() {
-  const content = await getContent();
- 
-  // Map over your movies to create an array of params objects
-  return content.movies.map((movie) => ({
-    id: movie.id,
-  }));
-}
 
 export default async function MovieDetailPage({ params }: { params: { id: string } }) {
   const content = await getContent();
