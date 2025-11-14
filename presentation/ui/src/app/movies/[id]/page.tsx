@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { MovieClientPage } from './client-page';
 import type { Movie } from '@/lib/types';
 
-
+export const dynamic = 'force-dynamic'
 
 export default async function MovieDetailPage({ params }: { params: { id: string } }) {
   const content = await getContent();

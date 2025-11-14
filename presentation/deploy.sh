@@ -19,9 +19,8 @@ deploy_ui() {
     echo "Backend URL is not available. Cannot deploy UI."
     exit 1
   fi
-  echo "Deploying UI with backend URL: $BACKEND_URL"
-  gcloud builds submit . --config cloudbuild.yaml --substitutions=_BACKEND_URL=$BACKEND_URL
-}
+    echo "Deploying UI with backend URL: $BACKEND_URL"             
+    (cd ui && gcloud builds submit . --config cloudbuild.yaml --substitutions=_BACKEND_URL=$BACKEND_URL --machine-type=e2-highcpu-32)}
 
 # Main logic
 case "$1" in

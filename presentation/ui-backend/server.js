@@ -22,9 +22,10 @@ const storage = new Storage();
 
 app.get('/api/movies', async (req, res) => {
   try {
+    logger.log('Fetching movies...');
     const collectionName = process.env.FIRESTORE_COLLECTION || 'media_assets';
     const moviesCollection = db.collection(collectionName);
-    const snapshot = await moviesCollection.get();
+    const snapshot = await moviesCollection.get();1
     if (snapshot.empty) {
       logger.log('No matching documents.');
       return res.status(404).send('No movies found');
@@ -51,6 +52,7 @@ app.get('/api/movies', async (req, res) => {
       return movie;
     }));
 
+    logger.log(`Movies fetched successfully: ${moviesWithSignedUrls.length} entries.`);
     res.json(moviesWithSignedUrls);
   } catch (error) {
     logger.error('Error fetching movies:', error);

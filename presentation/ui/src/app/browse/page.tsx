@@ -9,6 +9,8 @@ import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { logger } from '@/lib/logger';
 
+export const dynamic = 'force-dynamic'
+
 // Helper to convert a Clip to a Short
 const clipToShort = (clip: any, index: number, movie: Movie): Short => ({
   id: `${movie.id}-short-${index}`,

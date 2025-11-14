@@ -4,6 +4,8 @@ import { InspireMeClientPage } from './client-page';
 import { getContent } from '@/lib/data';
 import type { Short, ShortWithMovieInfo, Movie } from '@/lib/types';
 
+export const dynamic = 'force-dynamic'
+
 // Helper to convert a Clip to a Short
 const clipToShort = (clip: any, index: number, movie: Movie): Short => ({
   id: `${movie.id}-short-${index}`,

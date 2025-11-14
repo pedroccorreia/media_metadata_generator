@@ -676,7 +676,26 @@ resource "google_service_account_iam_member" "compute_sa_ui_backend_sa_user" {
   member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
+resource "google_service_account_iam_member" "compute_sa_ui_sa_user" {
+  service_account_id = google_service_account.ui_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
 #### UI Deployment
+resource "google_service_account" "ui_sa" {
+  project =  var.project_id
+  account_id   = "nebula-foundry-ui-sa"
+  display_name = "UI Service Account"
+  depends_on   = [google_project_service.apis["iam.googleapis.com"]]
+}
+
+resource "google_project_iam_member" "ui_sa_discoveryengine_viewer" {
+  project = var.project_id
+  role    = "roles/discoveryengine.viewer"
+  member  = "serviceAccount:${google_service_account.ui_sa.email}"
+}
+
 resource "google_service_account" "ui_backend_sa" {
   project =  var.project_id
   account_id   = "ui-backend-sa"
@@ -708,6 +727,12 @@ resource "google_project_iam_member" "ui_backend_sa_datastore_user" {
   member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
 }
 
+resource "google_project_iam_member" "ui_backend_sa_discoveryengine_viewer" {
+  project = var.project_id
+  role    = "roles/discoveryengine.viewer"
+  member  = "serviceAccount:${google_service_account.ui_backend_sa.email}"
+}
+
 # UI Services
 resource "google_cloud_run_service" "ui_service" {
   name     = "nebula-foundry-ui"
@@ -715,7 +740,7 @@ resource "google_cloud_run_service" "ui_service" {
   project  = var.project_id
   template {
     spec {
-      service_account_name  = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+      service_account_name  = google_service_account.ui_sa.email
       containers {
         image = var.nebula_foundry_ui_image
         env {
@@ -726,16 +751,32 @@ resource "google_cloud_run_service" "ui_service" {
           name  = "GCP_REGION"
           value = var.region
         }
+        env {
+          name  = "VAIS_PROJECT_ID"
+          value = data.google_project.project.number
+        }
+        env {
+          name  = "VAIS_LOCATION"
+          value = var.vais_location
+        }
+        env {
+          name  = "VAIS_COLLECTION_ID"
+          value = var.vais_collection_id
+        }
+        env {
+          name  = "VAIS_ENGINE_ID"
+          value = var.vais_engine_id
+        }
+        env {
+          name  = "VAIS_SERVING_CONFIG"
+          value = var.vais_serving_config
+        }
       }
     }
   }
 }
 
-resource "google_service_account_iam_member" "default_account_iam" {
-  service_account_id = "projects/-/serviceAccounts/${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
-}
+
 
 
 resource "google_cloud_run_service" "ui_backend_service" {
@@ -756,6 +797,26 @@ resource "google_cloud_run_service" "ui_backend_service" {
         env {
           name  = "GCP_REGION"
           value = var.region
+        }
+        env {
+          name  = "VAIS_PROJECT_ID"
+          value = data.google_project.project.number
+        }
+        env {
+          name  = "VAIS_LOCATION"
+          value = var.vais_location
+        }
+        env {
+          name  = "VAIS_COLLECTION_ID"
+          value = var.vais_collection_id
+        }
+        env {
+          name  = "VAIS_ENGINE_ID"
+          value = var.vais_engine_id
+        }
+        env {
+          name  = "VAIS_SERVING_CONFIG"
+          value = var.vais_serving_config
         }
       }
     }

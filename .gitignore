@@ -24,7 +24,7 @@ pytest.ini
 .pytest_cache
 
 #Remove node modules
-presentation/node_modules
+presentation/*/node_modules
 presentation/ui-backend/node_modules
 presentation/docs
 

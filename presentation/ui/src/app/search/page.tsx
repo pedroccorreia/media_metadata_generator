@@ -1,17 +1,12 @@
 
-import { search } from '@/ai/flows/search';
-import { MovieCard } from '@/components/movie-card';
-import { getContent } from '@/lib/data';
-import type { Movie } from '@/lib/types';
+import { searchVAIS } from '@/lib/vais';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import { Link as LinkIcon, FileText, Beaker } from 'lucide-react';
 import {
@@ -23,14 +18,12 @@ import {
 
 interface SearchPageProps {
   searchParams: {
-    q?: string;
+    q?: string | string[];
   };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const { q } = await searchParams
-  // const query = searchParams.q;
-  const query = q
+  const query = Array.isArray(searchParams.q) ? searchParams.q[0] : searchParams.q;
 
   if (!query) {
     return (
@@ -45,7 +38,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     );
   }
 
-  const { summary, results, rawResponse } = await search({ query });
+  const { summary, results, rawResponse } = await searchVAIS(query);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">

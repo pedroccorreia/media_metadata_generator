@@ -4,6 +4,8 @@ import { getContent } from '@/lib/data';
 import { MovieCard } from '@/components/movie-card';
 import { logger } from '@/lib/logger';
 
+export const dynamic = 'force-dynamic'
+
 export default async function MoviesPage() {
   logger.log('Rendering MoviesPage...');
   const content = await getContent();

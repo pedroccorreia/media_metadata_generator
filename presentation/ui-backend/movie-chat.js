@@ -26,11 +26,13 @@ async function movieChat(input) {
   }));
 
   console.log('Chat prompt ' + input.query)
+
   let output;
   try {
+    const prompt = `You are a media expert you give users short answer and ground it on the data whenever possible. User question: ${input.query}`;
     const result = await ai.generate({
       model: vertexAI.model('gemini-1.5-flash'),
-      prompt: 'You are a media expert you give users short answer and ground it on the data whenever possible. User question: ' + input.query,
+      prompt: prompt,
     })
 
 

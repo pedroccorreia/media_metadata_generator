@@ -108,3 +108,24 @@ variable "previews_generator_concurrency" {
   type        = number
   default     = 80
 }
+
+variable "vais_location" {
+  description = "The location of the VAIS service."
+  type        = string
+}
+
+variable "vais_collection_id" {
+  description = "The collection ID for the VAIS service."
+  type        = string
+}
+
+variable "vais_engine_id" {
+  description = "The engine ID for the VAIS service."
+  type        = string
+}
+
+variable "vais_serving_config" {
+  description = "The serving config for the VAIS service."
+  type        = string
+  default     = "default_search"
+}
