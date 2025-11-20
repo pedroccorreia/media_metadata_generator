@@ -1,7 +1,7 @@
+const { GoogleAuth } = require('google-auth-library');
+const logger = require('./logger');
 
-import { GoogleAuth } from 'google-auth-library';
-
-export async function searchVAIS(query: string) {
+async function searchVAIS(query) {
   try {
     if (!query) {
       throw new Error('Query is required');
@@ -46,14 +46,13 @@ export async function searchVAIS(query: string) {
       spellCorrectionSpec: {
         mode: 'AUTO',
       },
-      languageCode: 'en-US',
+      languageCode: 'en-AU',
       userInfo: {
         timeZone: 'Australia/Sydney',
       },
     };
 
-    // getting search results
-    console.log('VAIS url: ', url)
+    
     const vaisResponse = await fetch(url, {
       method: 'POST',
       headers: {
@@ -65,34 +64,31 @@ export async function searchVAIS(query: string) {
 
     if (!vaisResponse.ok) {
       const errorBody = await vaisResponse.text();
-      console.error('VAIS API request failed:', errorBody);
+      logger.error('VAIS API request failed:', errorBody);
       throw new Error(`VAIS API request failed: ${vaisResponse.statusText}`);
     }
 
-    console.log('VAIS Response ', vaisResponse)
-
     const data = await vaisResponse.json();
-
-    const results = data.results?.map((item: any) => ({
-      title: item.document.derivedStructData.title,
-      url: item.document.derivedStructData.url,
-      snippet: item.document.derivedStructData.snippets?.[0]?.snippet,
-      posterUrl: item.document.derivedStructData.poster_url,
+    
+    const results = data.results?.map((item) => ({
+      title: item.document.structData.file_name,
+      snippet: item.document.structData.summary.summary,
+      posterUrl: item.document.structData.poster_url,
     })) || [];
 
-    const summary = data.summary?.summaryText || 'No summary available.';
-
-    console.log('VAIS summary ', vaisResponse)
-    console.log('VAIS results ', results.length)
-
+    const summary = data.summary?.summary || 'No summary available.';
+    logger.log('returning results ', results.length)
+    
     return {
       summary,
       results,
       rawResponse: data,
     };
 
-  } catch (error: any) {
-    console.error('Error in searchVAIS:', error);
+  } catch (error) {
+    logger.error('Error in searchVAIS:', error);
     throw new Error(error.message || 'An unexpected error occurred.');
   }
 }
+
+module.exports = { searchVAIS };

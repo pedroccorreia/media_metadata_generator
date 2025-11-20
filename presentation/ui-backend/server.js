@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { movieChat } = require('./movie-chat');
+const { searchVAIS } = require('./vais');
 const logger = require('./logger');
 const admin = require('firebase-admin');
 
@@ -22,12 +23,12 @@ const storage = new Storage();
 
 app.get('/api/movies', async (req, res) => {
   try {
-    logger.log('Fetching movies...');
+    
     const collectionName = process.env.FIRESTORE_COLLECTION || 'media_assets';
     const moviesCollection = db.collection(collectionName);
-    const snapshot = await moviesCollection.get();1
+    const snapshot = await moviesCollection.get();
     if (snapshot.empty) {
-      logger.log('No matching documents.');
+      
       return res.status(404).send('No movies found');
     }
     const movies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -52,11 +53,29 @@ app.get('/api/movies', async (req, res) => {
       return movie;
     }));
 
-    logger.log(`Movies fetched successfully: ${moviesWithSignedUrls.length} entries.`);
+    
     res.json(moviesWithSignedUrls);
   } catch (error) {
     logger.error('Error fetching movies:', error);
     res.status(500).send('Error fetching movies');
+  }
+});
+
+app.get('/api/search', async (req, res) => {
+  const { q } = req.query;
+  
+  if (!q) {
+    return res.status(400).send('Query parameter "q" is required');
+  }
+  try {
+    logger.log('Search query: ', q)
+    const results = await searchVAIS(q);
+    logger.log('Search query provided results.')
+    
+    res.json(results);
+  } catch (error) {
+    logger.error('Error in search endpoint:', error);
+    res.status(500).send('Error performing search');
   }
 });
 
@@ -70,10 +89,10 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3001;
 
 io.on('connection', (socket) => {
-  logger.log('a user connected');
+  
 
   socket.on('disconnect', () => {
-    logger.log('user disconnected');
+    
   });
 
   socket.on('chat message', async (msg) => {
@@ -88,5 +107,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  logger.log(`Server is running on port ${PORT}`);
+  
 });

@@ -129,3 +129,9 @@ variable "vais_serving_config" {
   type        = string
   default     = "default_search"
 }
+
+variable "ui_backend_url"{
+  description ="Backend API for the UI componenet"
+  type  = string
+  default = ""
+}

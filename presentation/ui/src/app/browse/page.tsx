@@ -47,7 +47,7 @@ const getShortsForSwimlane = (movies: Movie[], count: number): ShortWithMovieInf
 };
 
 export default async function BrowsePage() {
-  logger.log('Rendering Browse page');
+  
   const content = await getContent();
   const allShorts: ShortWithMovieInfo[] = content.movies.flatMap((movie) =>
     (movie.previews?.clips || []).map((clip, index) => {

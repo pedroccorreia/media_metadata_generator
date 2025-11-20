@@ -3,9 +3,6 @@ FROM node:22
 # Create and change to the app directory.
 WORKDIR /app
 
-ARG BACKEND_URL
-ENV NEXT_PUBLIC_BACKEND_URL=$BACKEND_URL
-
 # Copy application dependency manifests to the container image.
 # A wildcard is used to ensure both package.json AND package-lock.json are copied.
 # Copying this separately prevents re-running npm install on every code change.

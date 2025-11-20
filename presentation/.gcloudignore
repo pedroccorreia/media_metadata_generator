@@ -1,0 +1,5 @@
+# Exclude all node_modules in the UI folder
+ui/node_modules/*
+
+# Exclude all node_modules in the backend folder (if applicable)
+ui-backend/node_modules/

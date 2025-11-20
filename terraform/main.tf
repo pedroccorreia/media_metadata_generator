@@ -734,49 +734,6 @@ resource "google_project_iam_member" "ui_backend_sa_discoveryengine_viewer" {
 }
 
 # UI Services
-resource "google_cloud_run_service" "ui_service" {
-  name     = "nebula-foundry-ui"
-  location = var.region
-  project  = var.project_id
-  template {
-    spec {
-      service_account_name  = google_service_account.ui_sa.email
-      containers {
-        image = var.nebula_foundry_ui_image
-        env {
-          name  = "GCP_PROJECT_ID"
-          value = var.project_id
-        }
-        env {
-          name  = "GCP_REGION"
-          value = var.region
-        }
-        env {
-          name  = "VAIS_PROJECT_ID"
-          value = data.google_project.project.number
-        }
-        env {
-          name  = "VAIS_LOCATION"
-          value = var.vais_location
-        }
-        env {
-          name  = "VAIS_COLLECTION_ID"
-          value = var.vais_collection_id
-        }
-        env {
-          name  = "VAIS_ENGINE_ID"
-          value = var.vais_engine_id
-        }
-        env {
-          name  = "VAIS_SERVING_CONFIG"
-          value = var.vais_serving_config
-        }
-      }
-    }
-  }
-}
-
-
 
 
 resource "google_cloud_run_service" "ui_backend_service" {
@@ -795,6 +752,14 @@ resource "google_cloud_run_service" "ui_backend_service" {
           value = var.project_id
         }
         env {
+          name = "PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name = "DATA_STORE_ID"
+          value = google_discovery_engine_data_store.firestore_datastore.data_store_id
+        }
+        env {
           name  = "GCP_REGION"
           value = var.region
         }
@@ -822,3 +787,30 @@ resource "google_cloud_run_service" "ui_backend_service" {
     }
   }
 }
+resource "google_cloud_run_service" "ui_service" {
+  name     = "nebula-foundry-ui"
+  location = var.region
+  project  = var.project_id
+  depends_on = [ google_cloud_run_service.ui_backend_service ]
+  template {
+    spec {
+      service_account_name  = google_service_account.ui_sa.email
+      containers {
+        image = var.nebula_foundry_ui_image
+        env {
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
+        }
+        env {
+          name  = "GCP_REGION"
+          value = var.region
+        }
+        env {
+          name  = "API_URL"
+          value = google_cloud_run_service.ui_backend_service.status[0].url
+        }
+      }
+    }
+  }
+}
+

@@ -1,17 +1,10 @@
 
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
-
-    if (!query) {
-      return new NextResponse('Query parameter "q" is required', { status: 400 });
-    }
-
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-    const res = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${backendUrl}/api/movies`);
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -21,7 +14,7 @@ export async function GET(request: Request) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error proxying /api/search:', error);
+    console.error('Error proxying /api/movies:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
